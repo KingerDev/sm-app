@@ -102,7 +102,7 @@ export default function Gallery({ navigate }) {
                                             border: '0.5px solid var(--line)', cursor: 'pointer',
                                             background: 'var(--surface)', font: 'inherit', color: 'inherit',
                                         }} onClick={() => navigate('moment:' + it.mom.slug)}>
-                                            <Photo seed={it.mom.seed} url={it.mom.photos?.[0]?.url} style={{ height: 170, borderRadius: 0 }} />
+                                            <Photo seed={it.mom.seed} url={it.mom.photos?.[0]?.thumb_url || it.mom.photos?.[0]?.url} style={{ height: 170, borderRadius: 0 }} />
                                             <div className="col gap-6" style={{ padding: 14 }}>
                                                 <div className="row between">
                                                     <div className="eyebrow">{it.mom.date_short} · 📍 {it.mom.place_short}</div>
@@ -181,7 +181,7 @@ export default function Gallery({ navigate }) {
                                                     border: '0.5px solid var(--line)', background: 'var(--surface)',
                                                     font: 'inherit', color: 'inherit', textAlign: 'left', flexShrink: 0,
                                                 }}>
-                                                <Photo seed={m.seed} url={m.photos?.[0]?.url} style={{ width: 150, height: 100, borderRadius: 0 }} />
+                                                <Photo seed={m.seed} url={m.photos?.[0]?.thumb_url || m.photos?.[0]?.url} style={{ width: 150, height: 100, borderRadius: 0 }} />
                                                 <div className="col gap-2" style={{ padding: '8px 10px 10px' }}>
                                                     <div style={{ fontSize: 12.5, fontWeight: 500, lineHeight: 1.2 }}>{m.title}</div>
                                                     <div className="eyebrow" style={{ textTransform: 'none', letterSpacing: 0 }}>

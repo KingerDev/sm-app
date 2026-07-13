@@ -62,6 +62,40 @@ class ApiTest extends TestCase
         $this->getJson("/api/v1/moments/{$slug}")->assertNotFound();
     }
 
+    public function test_photo_upload_is_optimized_to_webp_with_thumbnail(): void
+    {
+        \Storage::fake('public');
+        $this->actingAs($this->actingUser());
+
+        $moment = \App\Models\Moment::create([
+            'slug' => 'foto-test', 'title' => 'Foto test', 'place' => 'doma',
+            'place_short' => 'doma', 'date_start' => '2026-07-01',
+            'date_display' => '1. júl 2026', 'date_short' => 'júl 2026', 'seed' => 'home',
+        ]);
+
+        $file = \Illuminate\Http\Testing\File::image('velka.jpg', 4000, 3000);
+
+        $res = $this->post('/api/v1/photos', [
+            'type' => 'moment', 'id' => $moment->id, 'files' => [$file],
+        ], ['Accept' => 'application/json'])->assertCreated();
+
+        $photo = \App\Models\Photo::first();
+        $this->assertStringEndsWith('.webp', $photo->path);
+        $this->assertStringEndsWith('-thumb.webp', $photo->thumb_path);
+        \Storage::disk('public')->assertExists($photo->path);
+        \Storage::disk('public')->assertExists($photo->thumb_path);
+
+        // hlavná fotka zmenšená na max 2560 px
+        [$w, $h] = getimagesizefromstring(\Storage::disk('public')->get($photo->path));
+        $this->assertLessThanOrEqual(2560, max($w, $h));
+
+        // miniatúra max 480 px
+        [$tw, $th] = getimagesizefromstring(\Storage::disk('public')->get($photo->thumb_path));
+        $this->assertLessThanOrEqual(480, max($tw, $th));
+
+        $this->assertArrayHasKey('thumb_url', $res->json()[0]);
+    }
+
     public function test_locked_capsule_hides_content(): void
     {
         $this->actingAs($this->actingUser());

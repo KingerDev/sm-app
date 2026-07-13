@@ -127,7 +127,7 @@ export default function Home({ navigate }) {
                         </div>
                         <div className="row gap-4">
                             {moments.slice(0, 4).map(mm => (
-                                <Photo key={mm.id} seed={mm.seed} url={mm.photos?.[0]?.url}
+                                <Photo key={mm.id} seed={mm.seed} url={mm.photos?.[0]?.thumb_url || mm.photos?.[0]?.url}
                                     style={{ width: 30, height: 30, borderRadius: 6 }} />
                             ))}
                         </div>
@@ -166,7 +166,7 @@ export default function Home({ navigate }) {
 
                         <button className="card flush" style={{ width: '100%', padding: 0, border: '0.5px solid var(--line)', cursor: 'pointer', background: 'var(--surface)' }}
                             onClick={() => navigate('moment:' + m.slug)}>
-                            <Photo seed={m.seed} url={m.photos?.[0]?.url} style={{ height: 200, borderRadius: 0 }} />
+                            <Photo seed={m.seed} url={m.photos?.[0]?.thumb_url || m.photos?.[0]?.url} style={{ height: 200, borderRadius: 0 }} />
                             <div className="col gap-6" style={{ padding: 14, textAlign: 'left' }}>
                                 <div className="row between">
                                     <div className="eyebrow">{m.date_short} · {m.place_short}</div>

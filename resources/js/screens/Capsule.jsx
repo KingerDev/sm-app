@@ -223,7 +223,7 @@ const OpenedCapsule = ({ capsule: c, onOpen }) => (
         font: 'inherit', color: 'inherit', padding: 0, overflow: 'hidden', display: 'block',
     }}>
         <div style={{ position: 'relative' }}>
-            <Photo seed={c.seed} url={c.photos?.[0]?.url} style={{ height: 110, borderRadius: 0 }} />
+            <Photo seed={c.seed} url={c.photos?.[0]?.thumb_url || c.photos?.[0]?.url} style={{ height: 110, borderRadius: 0 }} />
             <div style={{
                 position: 'absolute', top: 10, left: 10,
                 background: 'rgba(45, 90, 61, 0.92)', color: 'var(--paper)',
@@ -342,7 +342,7 @@ function CapsuleDetail({ capsule: c, onClose }) {
                 /* ---- Otvorená ---- */
                 <div className="scroll" style={{ flex: 1, paddingTop: 6 }}>
                     <div style={{ position: 'relative', margin: '0 -20px 20px' }}>
-                        <Photo seed={c.seed} url={c.photos?.[0]?.url} style={{ height: 180, borderRadius: 0 }} />
+                        <Photo seed={c.seed} url={c.photos?.[0]?.thumb_url || c.photos?.[0]?.url} style={{ height: 180, borderRadius: 0 }} />
                     </div>
 
                     {c.has_letter && (c.letter || c.preview || c.note) && (
@@ -387,7 +387,7 @@ function CapsuleDetail({ capsule: c, onClose }) {
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 4, marginBottom: 20 }}>
                                 {c.photos?.length
                                     ? c.photos.map((p, i) => (
-                                        <Photo key={p.id} url={p.url} seed={c.seed}
+                                        <Photo key={p.id} url={p.thumb_url || p.url} seed={c.seed}
                                             onClick={() => setLightbox(i)}
                                             style={{ aspectRatio: '1', borderRadius: 6, cursor: 'pointer' }} />
                                     ))

@@ -3,6 +3,7 @@ import { cloneElement, useRef, useState } from 'react';
 import { api, ApiError } from '../api';
 import { useStore } from '../store';
 import { Icons, Photo, Sheet } from '../components/shell';
+import PhotoEditor from '../components/PhotoEditor';
 import { toInputDate } from '../lib/dates';
 
 const ALL_TAGS = ['cestovanie', 'jedlo', 'zážitky', 'my dvaja', 'rodina'];
@@ -45,6 +46,7 @@ export function MomentForm({ slug, onBack, navigate }) {
     const [newTag, setNewTag] = useState('');
     const [note, setNote] = useState(edit ? (moment.description || '') : '');
     const [files, setFiles] = useState([]); // { file, url }
+    const [editIndex, setEditIndex] = useState(null); // index fotky v editore
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState(null);
     const fileRef = useRef(null);
@@ -175,13 +177,20 @@ export function MomentForm({ slug, onBack, navigate }) {
                         <div className="row gap-8" style={{ width: 'max-content', paddingRight: 20 }}>
                             {files.map((f, i) => (
                                 <div key={f.url} style={{ position: 'relative', flexShrink: 0 }}>
-                                    <Photo url={f.url} style={{ width: 72, height: 72, borderRadius: 12 }} />
+                                    <Photo url={f.url} onClick={() => setEditIndex(i)}
+                                        style={{ width: 72, height: 72, borderRadius: 12, cursor: 'pointer' }} />
                                     <button onClick={() => removeFile(i)} style={{
                                         position: 'absolute', top: 4, right: 4, width: 20, height: 20,
                                         borderRadius: '50%', border: 'none', cursor: 'pointer',
                                         background: 'rgba(20,30,22,0.55)', color: 'var(--paper)',
                                         display: 'grid', placeItems: 'center', padding: 0,
                                     }}>{cloneElement(Icons.close, { style: { width: 11, height: 11 } })}</button>
+                                    <button onClick={() => setEditIndex(i)} style={{
+                                        position: 'absolute', bottom: 4, right: 4, width: 20, height: 20,
+                                        borderRadius: '50%', border: 'none', cursor: 'pointer',
+                                        background: 'rgba(20,30,22,0.55)', color: 'var(--paper)',
+                                        display: 'grid', placeItems: 'center', padding: 0,
+                                    }}>{cloneElement(Icons.edit, { style: { width: 11, height: 11 } })}</button>
                                 </div>
                             ))}
                         </div>
@@ -301,6 +310,20 @@ export function MomentForm({ slug, onBack, navigate }) {
                         : (edit ? 'uložiť zmeny' : 'uložiť moment')}
                 </button>
             </div>
+
+            {editIndex !== null && files[editIndex] && (
+                <PhotoEditor
+                    file={files[editIndex].file}
+                    onCancel={() => setEditIndex(null)}
+                    onSave={(edited) => {
+                        URL.revokeObjectURL(files[editIndex].url);
+                        setFiles(files.map((f, j) => j === editIndex
+                            ? { file: edited, url: URL.createObjectURL(edited) }
+                            : f));
+                        setEditIndex(null);
+                    }}
+                />
+            )}
 
             {placeSheet && (
                 <PlacePicker
@@ -541,7 +564,7 @@ export function MomentSearch({ onBack, navigate }) {
                                     background: 'var(--surface)', font: 'inherit', color: 'inherit',
                                     alignItems: 'center',
                                 }}>
-                                <Photo seed={m.seed} url={m.photos?.[0]?.url}
+                                <Photo seed={m.seed} url={m.photos?.[0]?.thumb_url || m.photos?.[0]?.url}
                                     style={{ width: 64, height: 64, borderRadius: 12, flexShrink: 0 }} />
                                 <div className="col grow" style={{ minWidth: 0, gap: 3 }}>
                                     <div style={{ fontSize: 14.5, fontWeight: 500 }}>{m.title}</div>

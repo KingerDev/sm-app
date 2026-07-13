@@ -433,7 +433,7 @@ function CountryDetail({ country, onClose, navigate }) {
                                             border: '0.5px solid var(--line)', cursor: 'pointer', alignItems: 'center',
                                             background: 'var(--surface)', font: 'inherit', color: 'inherit',
                                         }}>
-                                        <Photo seed={m.seed} url={m.photos?.[0]?.url}
+                                        <Photo seed={m.seed} url={m.photos?.[0]?.thumb_url || m.photos?.[0]?.url}
                                             style={{ width: 60, height: 60, borderRadius: 12, flexShrink: 0 }} />
                                         <div className="col grow" style={{ minWidth: 0, gap: 3 }}>
                                             <div style={{ fontSize: 14, fontWeight: 500 }}>{m.title}</div>

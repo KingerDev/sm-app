@@ -6,9 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Models\Capsule;
 use App\Models\Moment;
 use App\Models\Photo;
+use App\Support\Images;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 
 class PhotoController extends Controller
 {
@@ -18,7 +18,7 @@ class PhotoController extends Controller
             'type'     => 'required|in:moment,capsule',
             'id'       => 'required|integer',
             'files'    => 'required|array|min:1',
-            'files.*'  => 'file|image|max:15360',
+            'files.*'  => 'file|image|max:40960',
             'taken_at' => 'nullable|date',
         ]);
 
@@ -29,10 +29,11 @@ class PhotoController extends Controller
         $maxSort = $parent->photos()->max('sort_order') ?? 0;
 
         $photos = collect($request->file('files'))->values()->map(function ($file, $i) use ($parent, $data, $maxSort) {
-            $path = $file->store($data['type'] === 'moment' ? 'photos/moments' : 'photos/capsules', 'public');
+            // Optimalizácia: WebP max 2560 px + miniatúra (z ~25 MB ostane ~1 MB)
+            $stored = Images::store($file, $data['type'] === 'moment' ? 'photos/moments' : 'photos/capsules');
 
             return $parent->photos()->create([
-                'path'       => $path,
+                ...$stored,
                 'taken_at'   => $data['taken_at'] ?? null,
                 'sort_order' => $maxSort + $i + 1,
             ]);
@@ -58,8 +59,7 @@ class PhotoController extends Controller
         $photo = Photo::findOrFail($id);
         $parent = $photo->photoable;
 
-        Storage::disk('public')->delete($photo->path);
-        $photo->delete();
+        $photo->delete(); // súbory zmaže model event
 
         $this->syncCounts($parent);
 

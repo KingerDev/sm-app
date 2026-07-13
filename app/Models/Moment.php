@@ -26,4 +26,12 @@ class Moment extends Model
             ->orderByDesc('is_pinned')
             ->orderBy('sort_order');
     }
+
+    protected static function booted(): void
+    {
+        // so zmazaným momentom odídu aj jeho fotky (súbory + záznamy)
+        static::deleting(function (Moment $moment) {
+            $moment->photos->each->delete();
+        });
+    }
 }

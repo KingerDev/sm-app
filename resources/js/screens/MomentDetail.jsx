@@ -4,12 +4,15 @@ import { api } from '../api';
 import { useStore } from '../store';
 import { Icons, Photo, Sheet, photoUrl } from '../components/shell';
 import Lightbox from '../components/Lightbox';
+import PhotoEditor from '../components/PhotoEditor';
 
 export default function MomentDetail({ slug, onBack, navigate }) {
     const { moments, refresh } = useStore();
     const [sheet, setSheet] = useState(null); // 'menu' | 'all'
     const [lightbox, setLightbox] = useState(null); // index otvorenej fotky
     const [uploading, setUploading] = useState(false);
+    const [pending, setPending] = useState([]); // { file, url } — vybrané, ešte nenahraté
+    const [editIndex, setEditIndex] = useState(null);
     const [error, setError] = useState(null);
     const fileRef = useRef(null);
 
@@ -20,7 +23,7 @@ export default function MomentDetail({ slug, onBack, navigate }) {
     const real = (m.photos || []).slice().sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
     const hasReal = real.length > 0;
     const items = hasReal
-        ? real.map(p => ({ id: p.id, url: p.url, pinned: !!p.is_pinned, real: true }))
+        ? real.map(p => ({ id: p.id, url: p.url, thumb: p.thumb_url || p.url, pinned: !!p.is_pinned, real: true }))
         : Array.from({ length: Math.min(m.photos_count || 0, 12) }).map((_, i) => ({
             id: `ph-${i}`, url: photoUrl({ seed: m.seed, index: i }), pinned: false, real: false,
         }));
@@ -46,6 +49,13 @@ export default function MomentDetail({ slug, onBack, navigate }) {
         await api.delete(`/photos/${photo.id}`);
         await refresh('moments', 'stats');
     });
+
+    const confirmUpload = async () => {
+        const files = pending.map(p => p.file);
+        pending.forEach(p => URL.revokeObjectURL(p.url));
+        setPending([]);
+        await upload(files);
+    };
 
     const upload = async (files) => {
         if (!files.length) return;
@@ -90,7 +100,11 @@ export default function MomentDetail({ slug, onBack, navigate }) {
     return (
         <>
             <input ref={fileRef} type="file" accept="image/*" multiple style={{ display: 'none' }}
-                onChange={(e) => { upload(Array.from(e.target.files || [])); e.target.value = ''; }} />
+                onChange={(e) => {
+                    const picked = Array.from(e.target.files || []).map(f => ({ file: f, url: URL.createObjectURL(f) }));
+                    if (picked.length) setPending(prev => [...prev, ...picked]);
+                    e.target.value = '';
+                }} />
 
             {/* Plávajúca hlavička nad hero fotkou */}
             <div style={{
@@ -169,7 +183,7 @@ export default function MomentDetail({ slug, onBack, navigate }) {
                                 <div className="row gap-8" style={{ width: 'max-content', paddingRight: 20 }}>
                                     {hasReal
                                         ? pinnedItems.map(p => (
-                                            <Photo key={p.id} url={p.url}
+                                            <Photo key={p.id} url={p.thumb || p.url}
                                                 onClick={() => setLightbox(items.findIndex(it => it.id === p.id))}
                                                 style={{ width: 180, height: 230, borderRadius: 14, flexShrink: 0, cursor: 'pointer' }}>
                                                 <PhotoHeart pinned onClick={(e) => { e.stopPropagation(); togglePin(p); }} />
@@ -192,7 +206,7 @@ export default function MomentDetail({ slug, onBack, navigate }) {
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 4 }}>
                         {items.slice(0, 9).map((p, i) => (
-                            <Photo key={p.id} url={p.url}
+                            <Photo key={p.id} url={p.thumb || p.url}
                                 onClick={() => setLightbox(i)}
                                 style={{ aspectRatio: '1', borderRadius: 4, cursor: 'pointer' }}>
                                 {p.real && <PhotoHeart pinned={p.pinned} onClick={(e) => { e.stopPropagation(); togglePin(p); }} />}
@@ -225,6 +239,84 @@ export default function MomentDetail({ slug, onBack, navigate }) {
                     </div>
                 </div>
             </div>
+
+            {/* ---- Náhľad pred nahratím (s editorom) ---- */}
+            {pending.length > 0 && (
+                <div style={{
+                    position: 'absolute', inset: 0, zIndex: 40, background: 'var(--paper)',
+                    display: 'flex', flexDirection: 'column', animation: 'slideUp 260ms ease both',
+                }}>
+                    <div style={{
+                        display: 'flex', alignItems: 'center', gap: 12,
+                        padding: '16px 16px 12px', borderBottom: '0.5px solid var(--line)',
+                    }}>
+                        <button className="icon-btn" onClick={() => {
+                            pending.forEach(p => URL.revokeObjectURL(p.url));
+                            setPending([]);
+                        }} style={{ flexShrink: 0 }}>{Icons.close}</button>
+                        <div className="col grow" style={{ minWidth: 0 }}>
+                            <div className="eyebrow">pred nahratím</div>
+                            <div style={{ fontSize: 16, fontWeight: 500 }}>
+                                {pending.length} {pending.length === 1 ? 'fotka' : pending.length < 5 ? 'fotky' : 'fotiek'}
+                            </div>
+                        </div>
+                        <button className="icon-btn" onClick={() => fileRef.current?.click()} style={{ flexShrink: 0 }}>
+                            {Icons.plus}
+                        </button>
+                    </div>
+                    <div className="scroll" style={{ flex: 1, padding: 12 }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
+                            {pending.map((p, i) => (
+                                <div key={p.url} style={{ position: 'relative' }}>
+                                    <Photo url={p.url} onClick={() => setEditIndex(i)}
+                                        style={{ aspectRatio: '1', borderRadius: 10, cursor: 'pointer' }} />
+                                    <button onClick={() => {
+                                        URL.revokeObjectURL(p.url);
+                                        setPending(pending.filter((_, j) => j !== i));
+                                    }} style={{
+                                        position: 'absolute', top: 6, right: 6, width: 24, height: 24,
+                                        borderRadius: '50%', border: 'none', cursor: 'pointer',
+                                        background: 'rgba(20,30,22,0.55)', color: 'var(--paper)',
+                                        display: 'grid', placeItems: 'center', padding: 0,
+                                    }}>{cloneElement(Icons.close, { style: { width: 12, height: 12 } })}</button>
+                                    <button onClick={() => setEditIndex(i)} style={{
+                                        position: 'absolute', bottom: 6, right: 6, width: 24, height: 24,
+                                        borderRadius: '50%', border: 'none', cursor: 'pointer',
+                                        background: 'rgba(20,30,22,0.55)', color: 'var(--paper)',
+                                        display: 'grid', placeItems: 'center', padding: 0,
+                                    }}>{cloneElement(Icons.edit, { style: { width: 12, height: 12 } })}</button>
+                                </div>
+                            ))}
+                        </div>
+                        <div className="handwritten" style={{ textAlign: 'center', marginTop: 14, fontSize: 16, color: 'var(--muted)' }}>
+                            ťukni fotku pre orez a otočenie ✂
+                        </div>
+                    </div>
+                    <div style={{
+                        padding: '14px 16px calc(14px + var(--safe-bottom))',
+                        borderTop: '0.5px solid var(--line)', background: 'var(--paper)',
+                    }}>
+                        <button className="btn primary" onClick={confirmUpload}
+                            style={{ width: '100%', padding: 15, fontSize: 15 }}>
+                            nahrať {pending.length === 1 ? 'fotku' : pending.length < 5 ? `${pending.length} fotky` : `${pending.length} fotiek`}
+                        </button>
+                    </div>
+
+                    {editIndex !== null && pending[editIndex] && (
+                        <PhotoEditor
+                            file={pending[editIndex].file}
+                            onCancel={() => setEditIndex(null)}
+                            onSave={(edited) => {
+                                URL.revokeObjectURL(pending[editIndex].url);
+                                setPending(pending.map((p, j) => j === editIndex
+                                    ? { file: edited, url: URL.createObjectURL(edited) }
+                                    : p));
+                                setEditIndex(null);
+                            }}
+                        />
+                    )}
+                </div>
+            )}
 
             {/* ---- Lightbox ---- */}
             {lightbox !== null && (
@@ -269,7 +361,7 @@ export default function MomentDetail({ slug, onBack, navigate }) {
                     <div className="scroll" style={{ flex: 1, padding: 3 }}>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 3 }}>
                             {items.map((p, i) => (
-                                <Photo key={p.id} url={p.url} seed={`${m.seed}`} index={i}
+                                <Photo key={p.id} url={p.thumb || p.url} seed={`${m.seed}`} index={i}
                                     onClick={() => setLightbox(i)}
                                     style={{ aspectRatio: '1', borderRadius: 3, cursor: 'pointer' }}>
                                     {p.real ? (

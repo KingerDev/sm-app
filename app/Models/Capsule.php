@@ -33,4 +33,15 @@ class Capsule extends Model
             ? \Illuminate\Support\Facades\Storage::disk('public')->url($this->audio_path)
             : null;
     }
+
+    protected static function booted(): void
+    {
+        // so zmazanou kapsulou odídu aj fotky a audio
+        static::deleting(function (Capsule $capsule) {
+            $capsule->photos->each->delete();
+            if ($capsule->audio_path) {
+                \Illuminate\Support\Facades\Storage::disk('public')->delete($capsule->audio_path);
+            }
+        });
+    }
 }

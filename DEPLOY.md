@@ -37,9 +37,13 @@ php artisan config:cache && php artisan route:cache && php artisan view:cache
 
 - `APP_URL` = presná https doména — inak nebude fungovať prihlásenie (Sanctum
   session cookies) ani URL nahratých fotiek.
-- PHP >= 8.3, rozšírenia: pdo_mysql, gd/exif (fotky), fileinfo.
-- **Upload limity PHP** (hPanel → PHP konfigurácia): appka povoľuje fotky do 15 MB
-  a audio do 20 MB → nastav `upload_max_filesize=25M`, `post_max_size=30M`.
+- PHP >= 8.3, rozšírenia: pdo_mysql, **gd s podporou WebP** (fotky sa pri uploade
+  automaticky komprimujú na WebP — over cez `php -r "var_dump(function_exists('imagewebp'));"`),
+  exif, fileinfo.
+- **Upload limity PHP** (hPanel → PHP konfigurácia): appka povoľuje fotky do 40 MB
+  a audio do 20 MB → nastav `upload_max_filesize=48M`, `post_max_size=96M`
+  a `memory_limit=512M` (spracovanie veľkých fotiek). Na disk sa ukladajú už
+  skomprimované WebP (~1 MB), takže veľké limity miesto nezaberajú.
 - HTTPS zapnuté (Hostinger dáva Let's Encrypt zadarmo) — `SESSION_SECURE_COOKIE=true`.
 - Geokódovanie nových krajín volá `nominatim.openstreetmap.org` zo servera —
   na zdieľanom hostingu zvyčajne OK.
