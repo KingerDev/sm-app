@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="sk">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>S+M · app</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Caveat:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="hifi-system.css" />
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel" src="hifi-data.jsx"></script>
+<script type="text/babel" src="hifi-shell.jsx"></script>
+<script type="text/babel" src="hifi-mascot.jsx"></script>
+<script type="text/babel" src="hifi-capsule.jsx"></script>
+<script type="text/babel" src="hifi-home.jsx"></script>
+<script type="text/babel" src="hifi-bucket.jsx"></script>
+<script type="text/babel" src="hifi-bucket-add.jsx"></script>
+<script type="text/babel" src="hifi-gallery.jsx"></script>
+<script type="text/babel" src="hifi-map.jsx"></script>
+<script type="text/babel" src="hifi-stats.jsx"></script>
+<script type="text/babel" src="hifi-moment.jsx"></script>
+<script type="text/babel" src="hifi-moment-io.jsx"></script>
+<script type="text/babel" src="hifi-calendar.jsx"></script>
+
+<script type="text/babel" data-presets="env,react">
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "mascot": "orbits"
+}/*EDITMODE-END*/;
+
+const App = () => {
+  // Route: tab id | overlay 'moment:<id>' | 'wrapped' | 'capsule'
+  const [tab, setTab] = React.useState('home');
+  const [overlay, setOverlay] = React.useState(null);
+  const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+
+  const navigate = (target) => {
+    if (target.startsWith('moment:')) {
+      setOverlay(target);
+    } else if (target === 'wrapped' || target === 'capsule') {
+      setOverlay(target);
+    } else if (target.startsWith('wrapped-month:')) {
+      setOverlay(target);
+    } else if (target === 'moment-add') {
+      setOverlay('moment-add');
+    } else if (target === 'moment-search') {
+      setOverlay('moment-search');
+    } else if (target === 'calendar') {
+      setOverlay('calendar');
+    } else if (target === 'bucket-add') {
+      setOverlay('bucket-add');
+    } else if (['home', 'bucket', 'gallery', 'map', 'stats'].includes(target)) {
+      setOverlay(null);
+      setTab(target);
+    }
+  };
+
+  const renderTab = () => {
+    switch (tab) {
+      case 'home': return <Home navigate={navigate} mascotVariant={t.mascot} key="home" />;
+      case 'bucket': return <Bucket navigate={navigate} key="bucket" />;
+      case 'gallery': return <Gallery navigate={navigate} key="gallery" />;
+      case 'map': return <MapScreen navigate={navigate} key="map" />;
+      case 'stats': return <Stats navigate={navigate} key="stats" />;
+      default: return null;
+    }
+  };
+
+  return (
+    <div className="page">
+      <div className="page-title" style={{ display: 'flex', gap: 12, alignItems: 'center', justifyContent: 'center' }}>
+        <Mascot variant={t.mascot} size={42} />
+        <div>
+          S+M
+          <small>náš spoločný priestor · prototyp</small>
+        </div>
+      </div>
+
+      <Phone>
+        <div className="screen-content" key={tab}>
+          {renderTab()}
+        </div>
+        <TabBar active={tab} onChange={navigate} />
+
+        {/* Moment detail overlay */}
+        {overlay && overlay.startsWith('moment:') && (
+          <div style={{
+            position: 'absolute', inset: 0,
+            background: 'var(--paper)',
+            zIndex: 22,
+            display: 'flex', flexDirection: 'column',
+            animation: 'slideUp 320ms ease both',
+          }}>
+            <MomentDetail id={overlay.slice(7)} onBack={() => setOverlay(null)} />
+          </div>
+        )}
+
+        {/* Nový moment overlay */}
+        {overlay === 'moment-add' && (
+          <div style={{
+            position: 'absolute', inset: 0,
+            background: 'var(--paper)',
+            zIndex: 22,
+            display: 'flex', flexDirection: 'column',
+            animation: 'slideUp 320ms ease both',
+          }}>
+            <MomentAdd onBack={() => setOverlay(null)} />
+          </div>
+        )}
+
+        {/* Hľadanie momentov overlay */}
+        {overlay === 'moment-search' && (
+          <div style={{
+            position: 'absolute', inset: 0,
+            background: 'var(--paper)',
+            zIndex: 22,
+            display: 'flex', flexDirection: 'column',
+            animation: 'slideUp 320ms ease both',
+          }}>
+            <MomentSearch onBack={() => setOverlay(null)} navigate={navigate} />
+          </div>
+        )}
+
+        {/* Nový bucket list overlay */}
+        {overlay === 'bucket-add' && (
+          <div style={{
+            position: 'absolute', inset: 0,
+            background: 'var(--paper)',
+            zIndex: 22,
+            display: 'flex', flexDirection: 'column',
+            animation: 'slideUp 320ms ease both',
+          }}>
+            <BucketAdd onBack={() => setOverlay(null)} />
+          </div>
+        )}
+
+        {/* Dôležité dni (kalendár) overlay */}
+        {overlay === 'calendar' && (
+          <div style={{
+            position: 'absolute', inset: 0,
+            background: 'var(--paper)',
+            zIndex: 22,
+            display: 'flex', flexDirection: 'column',
+            animation: 'slideUp 320ms ease both',
+          }}>
+            <Calendar onBack={() => setOverlay(null)} navigate={navigate} />
+          </div>
+        )}
+
+        {/* Časová kapsula overlay */}
+        {overlay === 'capsule' && (
+          <div style={{
+            position: 'absolute', inset: 0,
+            background: 'var(--paper)',
+            zIndex: 22,
+            display: 'flex', flexDirection: 'column',
+            animation: 'slideUp 320ms ease both',
+          }}>
+            <Capsule onBack={() => setOverlay(null)} />
+          </div>
+        )}
+
+        {/* Wrapped story overlay — yearly or monthly */}
+        {overlay === 'wrapped' && (
+          <Wrapped onExit={() => setOverlay(null)} />
+        )}
+        {overlay && overlay.startsWith('wrapped-month:') && (() => {
+          const m = MONTHLY_WRAPPEDS.find(mm => mm.id === overlay.slice(14));
+          if (!m) return null;
+          return <Wrapped slides={monthlySlidesFor(m)} kind="monthly"
+            onExit={() => setOverlay(null)} />;
+        })()}
+      </Phone>
+
+      <div className="handwritten" style={{ textAlign: 'center', fontSize: 15, color: 'var(--muted)', maxWidth: 380, lineHeight: 1.4 }}>
+        tip · ťukni „Časovú kapsulu" na Domov · alebo Wrapped na Štatistikách
+      </div>
+
+      <TweaksPanel title="Tweaks">
+        <TweakSection label="Maskot páru">
+          <TweakRadio
+            label="Štýl"
+            value={t.mascot}
+            onChange={(v) => setTweak('mascot', v)}
+            options={[
+              { value: 'pebbles', label: 'Kamienky' },
+              { value: 'sprouts', label: 'Klíčky' },
+              { value: 'orbits', label: 'Kruhy' },
+            ]}
+          />
+          <div style={{
+            marginTop: 12, padding: 14, background: '#e8efe8',
+            borderRadius: 10, display: 'grid', placeItems: 'center',
+          }}>
+            <Mascot variant={t.mascot} size={72} />
+          </div>
+        </TweakSection>
+      </TweaksPanel>
+    </div>
+  );
+};
+
+// Add slide-up animation
+const styleEl = document.createElement('style');
+styleEl.textContent = `
+  @keyframes slideUp {
+    from { transform: translateY(40px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+`;
+document.head.appendChild(styleEl);
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

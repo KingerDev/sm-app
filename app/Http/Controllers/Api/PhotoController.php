@@ -1,0 +1,78 @@
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use App\Http\Controllers\Controller;
+use App\Models\Capsule;
+use App\Models\Moment;
+use App\Models\Photo;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
+
+class PhotoController extends Controller
+{
+    public function store(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'type'     => 'required|in:moment,capsule',
+            'id'       => 'required|integer',
+            'files'    => 'required|array|min:1',
+            'files.*'  => 'file|image|max:15360',
+            'taken_at' => 'nullable|date',
+        ]);
+
+        $parent = $data['type'] === 'moment'
+            ? Moment::findOrFail($data['id'])
+            : Capsule::findOrFail($data['id']);
+
+        $maxSort = $parent->photos()->max('sort_order') ?? 0;
+
+        $photos = collect($request->file('files'))->values()->map(function ($file, $i) use ($parent, $data, $maxSort) {
+            $path = $file->store($data['type'] === 'moment' ? 'photos/moments' : 'photos/capsules', 'public');
+
+            return $parent->photos()->create([
+                'path'       => $path,
+                'taken_at'   => $data['taken_at'] ?? null,
+                'sort_order' => $maxSort + $i + 1,
+            ]);
+        });
+
+        $this->syncCounts($parent);
+
+        return response()->json($photos->values(), 201);
+    }
+
+    public function togglePin(int $id): JsonResponse
+    {
+        $photo = Photo::findOrFail($id);
+        $photo->update(['is_pinned' => ! $photo->is_pinned]);
+
+        $this->syncCounts($photo->photoable);
+
+        return response()->json($photo);
+    }
+
+    public function destroy(int $id): JsonResponse
+    {
+        $photo = Photo::findOrFail($id);
+        $parent = $photo->photoable;
+
+        Storage::disk('public')->delete($photo->path);
+        $photo->delete();
+
+        $this->syncCounts($parent);
+
+        return response()->json(null, 204);
+    }
+
+    private function syncCounts(Moment|Capsule $parent): void
+    {
+        $parent->update([
+            'photos_count' => $parent->photos()->count(),
+            ...($parent instanceof Moment
+                ? ['pinned_count' => $parent->photos()->where('is_pinned', true)->count()]
+                : []),
+        ]);
+    }
+}
