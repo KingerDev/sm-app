@@ -2,7 +2,7 @@
 import { cloneElement, useCallback, useEffect, useRef, useState } from 'react';
 import { Icons } from './shell';
 
-export default function Lightbox({ items, index, onClose, onTogglePin, onDelete }) {
+export default function Lightbox({ items, index, onClose, onTogglePin, onDelete, onSetCover }) {
     const [i, setI] = useState(index ?? 0);
     const touchX = useRef(null);
 
@@ -63,6 +63,23 @@ export default function Lightbox({ items, index, onClose, onTogglePin, onDelete 
                     {i + 1} / {items.length}
                 </span>
                 <div className="row gap-8">
+                    {photo.real && onSetCover && (
+                        photo.cover ? (
+                            <span style={{
+                                alignSelf: 'center', fontSize: 10.5, letterSpacing: 1,
+                                textTransform: 'uppercase', color: 'rgba(255,255,255,0.8)',
+                                background: 'rgba(250,250,247,0.14)', padding: '6px 10px',
+                                borderRadius: 999, backdropFilter: 'blur(6px)',
+                            }}>titulná ✓</span>
+                        ) : (
+                            <button onClick={() => onSetCover(photo)} style={{
+                                border: 'none', cursor: 'pointer', font: 'inherit',
+                                fontSize: 10.5, letterSpacing: 1, textTransform: 'uppercase',
+                                color: 'var(--paper)', background: 'rgba(250,250,247,0.14)',
+                                padding: '6px 10px', borderRadius: 999, backdropFilter: 'blur(6px)',
+                            }}>nastaviť ako titulnú</button>
+                        )
+                    )}
                     {photo.real && onTogglePin && (
                         <button className="icon-btn" style={lbBtn} onClick={() => onTogglePin(photo)}>
                             {cloneElement(photo.pinned ? Icons.heartFill : Icons.heart, { style: { width: 18, height: 18 } })}

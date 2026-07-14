@@ -48,6 +48,7 @@ export function MomentForm({ slug, onBack, navigate }) {
     const [files, setFiles] = useState([]); // { file, url }
     const [editIndex, setEditIndex] = useState(null); // index fotky v editore
     const [busy, setBusy] = useState(false);
+    const [progress, setProgress] = useState(null); // { done, total } počas nahrávania fotiek
     const [error, setError] = useState(null);
     const fileRef = useRef(null);
 
@@ -100,11 +101,22 @@ export function MomentForm({ slug, onBack, navigate }) {
                 : await api.post('/moments', payload);
 
             if (files.length) {
-                const fd = new FormData();
-                fd.append('type', 'moment');
-                fd.append('id', saved.id);
-                files.forEach(f => fd.append('files[]', f.file));
-                await api.post('/photos', fd);
+                setProgress({ done: 0, total: files.length });
+                let failed = 0;
+                for (let i = 0; i < files.length; i++) {
+                    try {
+                        const fd = new FormData();
+                        fd.append('type', 'moment');
+                        fd.append('id', saved.id);
+                        fd.append('files[]', files[i].file);
+                        await api.post('/photos', fd);
+                    } catch {
+                        failed++;
+                    }
+                    setProgress({ done: i + 1, total: files.length });
+                }
+                setProgress(null);
+                if (failed) alert(`${failed} ${failed === 1 ? 'fotka sa nenahrala' : 'fotky sa nenahrali'} — vieš ich doplniť v detaile momentu.`);
             }
 
             await refresh('moments', 'stats', 'countries');
@@ -300,13 +312,30 @@ export function MomentForm({ slug, onBack, navigate }) {
                 padding: '14px 20px calc(14px + env(safe-area-inset-bottom))',
                 borderTop: '0.5px solid var(--line)', background: 'var(--paper)',
             }}>
+                {progress && (
+                    <div style={{ marginBottom: 10 }}>
+                        <div className="row between" style={{ marginBottom: 5 }}>
+                            <span className="eyebrow" style={{ color: 'var(--green)' }}>nahrávam fotky</span>
+                            <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--green)' }}>
+                                {progress.done} / {progress.total}
+                            </span>
+                        </div>
+                        <div style={{ height: 5, borderRadius: 3, background: 'var(--green-line)', overflow: 'hidden' }}>
+                            <div style={{
+                                width: `${Math.round(progress.done / progress.total * 100)}%`,
+                                height: '100%', background: 'var(--green)',
+                                transition: 'width 300ms ease',
+                            }} />
+                        </div>
+                    </div>
+                )}
                 <button className="btn primary" disabled={!canSave} onClick={save}
                     style={{
                         width: '100%', padding: '15px', fontSize: 15,
                         opacity: canSave ? 1 : 0.45, cursor: canSave ? 'pointer' : 'default',
                     }}>
                     {busy
-                        ? (files.length ? `ukladám + ${files.length} ${fotkaWord(files.length)}…` : 'ukladám…')
+                        ? (progress ? `nahrávam ${progress.done} / ${progress.total}…` : 'ukladám…')
                         : (edit ? 'uložiť zmeny' : 'uložiť moment')}
                 </button>
             </div>

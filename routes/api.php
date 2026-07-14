@@ -33,6 +33,7 @@ Route::prefix('v1')->group(function () {
 
         Route::post('/photos', [PhotoController::class, 'store']);
         Route::patch('/photos/{id}/pin', [PhotoController::class, 'togglePin']);
+        Route::patch('/photos/{id}/cover', [PhotoController::class, 'setCover']);
         Route::delete('/photos/{id}', [PhotoController::class, 'destroy']);
 
         Route::get('/bucket', [BucketController::class, 'index']);

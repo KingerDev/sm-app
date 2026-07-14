@@ -54,6 +54,21 @@ class PhotoController extends Controller
         return response()->json($photo);
     }
 
+    /** Nastaví fotku ako titulnú (cover) — ostatným fotkám momentu/kapsuly sa zruší. */
+    public function setCover(int $id): JsonResponse
+    {
+        $photo = Photo::findOrFail($id);
+
+        Photo::where('photoable_type', $photo->photoable_type)
+            ->where('photoable_id', $photo->photoable_id)
+            ->where('id', '!=', $photo->id)
+            ->update(['is_cover' => false]);
+
+        $photo->update(['is_cover' => true]);
+
+        return response()->json($photo);
+    }
+
     public function destroy(int $id): JsonResponse
     {
         $photo = Photo::findOrFail($id);

@@ -22,7 +22,9 @@ class Moment extends Model
 
     public function photos(): MorphMany
     {
+        // titulná fotka (is_cover) vždy prvá — všade sa používa photos[0] ako cover
         return $this->morphMany(Photo::class, 'photoable')
+            ->orderByDesc('is_cover')
             ->orderByDesc('is_pinned')
             ->orderBy('sort_order');
     }

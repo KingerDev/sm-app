@@ -96,6 +96,40 @@ class ApiTest extends TestCase
         $this->assertArrayHasKey('thumb_url', $res->json()[0]);
     }
 
+    public function test_cover_photo_moves_to_front(): void
+    {
+        \Storage::fake('public');
+        $this->actingAs($this->actingUser());
+
+        $moment = \App\Models\Moment::create([
+            'slug' => 'cover-test', 'title' => 'Cover test', 'place' => 'doma',
+            'place_short' => 'doma', 'date_start' => '2026-07-01',
+            'date_display' => '1. júl 2026', 'date_short' => 'júl 2026', 'seed' => 'home',
+        ]);
+
+        $this->post('/api/v1/photos', [
+            'type' => 'moment', 'id' => $moment->id,
+            'files' => [
+                \Illuminate\Http\Testing\File::image('prva.jpg', 800, 600),
+                \Illuminate\Http\Testing\File::image('druha.jpg', 800, 600),
+            ],
+        ], ['Accept' => 'application/json'])->assertCreated();
+
+        [$first, $second] = \App\Models\Photo::orderBy('id')->get();
+
+        $this->patchJson("/api/v1/photos/{$second->id}/cover")->assertOk();
+
+        $photos = $this->getJson('/api/v1/moments/cover-test')->json('photos');
+        $this->assertSame($second->id, $photos[0]['id']);
+        $this->assertTrue($photos[0]['is_cover']);
+
+        // prepnutie na prvú zruší cover druhej
+        $this->patchJson("/api/v1/photos/{$first->id}/cover")->assertOk();
+        $photos = $this->getJson('/api/v1/moments/cover-test')->json('photos');
+        $this->assertSame($first->id, $photos[0]['id']);
+        $this->assertFalse($photos[1]['is_cover']);
+    }
+
     public function test_locked_capsule_hides_content(): void
     {
         $this->actingAs($this->actingUser());

@@ -23,6 +23,7 @@ class Capsule extends Model
     public function photos(): MorphMany
     {
         return $this->morphMany(Photo::class, 'photoable')
+            ->orderByDesc('is_cover')
             ->orderByDesc('is_pinned')
             ->orderBy('sort_order');
     }

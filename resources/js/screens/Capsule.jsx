@@ -440,6 +440,7 @@ function CapsuleAdd({ onClose }) {
     const [photoFiles, setPhotoFiles] = useState([]);
     const [audioFile, setAudioFile] = useState(null);
     const [busy, setBusy] = useState(false);
+    const [progress, setProgress] = useState(null); // { done, total } počas nahrávania fotiek
     const [error, setError] = useState(null);
 
     // najbližšie výročie z together_since
@@ -479,11 +480,18 @@ function CapsuleAdd({ onClose }) {
             }
             const created = await api.post('/capsules', fd);
             if (photoFiles.length && created?.id) {
-                const pfd = new FormData();
-                pfd.append('type', 'capsule');
-                pfd.append('id', created.id);
-                photoFiles.forEach(f => pfd.append('files[]', f));
-                await api.post('/photos', pfd);
+                setProgress({ done: 0, total: photoFiles.length });
+                for (let i = 0; i < photoFiles.length; i++) {
+                    try {
+                        const pfd = new FormData();
+                        pfd.append('type', 'capsule');
+                        pfd.append('id', created.id);
+                        pfd.append('files[]', photoFiles[i]);
+                        await api.post('/photos', pfd);
+                    } catch { /* pokračuj ďalšou */ }
+                    setProgress({ done: i + 1, total: photoFiles.length });
+                }
+                setProgress(null);
             }
             await refresh('capsules', 'events');
             onClose();
@@ -634,12 +642,31 @@ function CapsuleAdd({ onClose }) {
                 padding: '14px 20px calc(14px + env(safe-area-inset-bottom))',
                 borderTop: '0.5px solid var(--line)', background: 'var(--paper)', flexShrink: 0,
             }}>
+                {progress && (
+                    <div style={{ marginBottom: 10 }}>
+                        <div className="row between" style={{ marginBottom: 5 }}>
+                            <span className="eyebrow" style={{ color: 'var(--green)' }}>nahrávam fotky</span>
+                            <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--green)' }}>
+                                {progress.done} / {progress.total}
+                            </span>
+                        </div>
+                        <div style={{ height: 5, borderRadius: 3, background: 'var(--green-line)', overflow: 'hidden' }}>
+                            <div style={{
+                                width: `${Math.round(progress.done / progress.total * 100)}%`,
+                                height: '100%', background: 'var(--green)',
+                                transition: 'width 300ms ease',
+                            }} />
+                        </div>
+                    </div>
+                )}
                 <button className="btn primary" disabled={!canSave} onClick={save}
                     style={{
                         width: '100%', padding: '15px', fontSize: 15,
                         opacity: canSave ? 1 : 0.45, cursor: canSave ? 'pointer' : 'default',
                     }}>
-                    {busy ? 'pečatím…' : 'zapečatiť kapsulu'}
+                    {busy
+                        ? (progress ? `nahrávam ${progress.done} / ${progress.total}…` : 'pečatím…')
+                        : 'zapečatiť kapsulu'}
                 </button>
             </div>
         </div>

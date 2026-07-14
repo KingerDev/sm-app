@@ -10,7 +10,8 @@ export default function MomentDetail({ slug, onBack, navigate }) {
     const { moments, refresh } = useStore();
     const [sheet, setSheet] = useState(null); // 'menu' | 'all'
     const [lightbox, setLightbox] = useState(null); // index otvorenej fotky
-    const [uploading, setUploading] = useState(false);
+    const [progress, setProgress] = useState(null); // { done, total } počas nahrávania
+    const uploading = progress !== null;
     const [pending, setPending] = useState([]); // { file, url } — vybrané, ešte nenahraté
     const [editIndex, setEditIndex] = useState(null);
     const [error, setError] = useState(null);
@@ -23,7 +24,7 @@ export default function MomentDetail({ slug, onBack, navigate }) {
     const real = (m.photos || []).slice().sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
     const hasReal = real.length > 0;
     const items = hasReal
-        ? real.map(p => ({ id: p.id, url: p.url, thumb: p.thumb_url || p.url, pinned: !!p.is_pinned, real: true }))
+        ? real.map(p => ({ id: p.id, url: p.url, thumb: p.thumb_url || p.url, pinned: !!p.is_pinned, cover: !!p.is_cover, real: true }))
         : Array.from({ length: Math.min(m.photos_count || 0, 12) }).map((_, i) => ({
             id: `ph-${i}`, url: photoUrl({ seed: m.seed, index: i }), pinned: false, real: false,
         }));
@@ -43,6 +44,12 @@ export default function MomentDetail({ slug, onBack, navigate }) {
         await refresh('moments', 'stats');
     });
 
+    const setCover = wrap(async (photo) => {
+        if (!photo.real) return;
+        await api.patch(`/photos/${photo.id}/cover`);
+        await refresh('moments');
+    });
+
     const deletePhoto = wrap(async (photo) => {
         if (!photo.real) return;
         if (!confirm('Naozaj vymazať túto fotku?')) return;
@@ -60,19 +67,24 @@ export default function MomentDetail({ slug, onBack, navigate }) {
     const upload = async (files) => {
         if (!files.length) return;
         setError(null);
-        setUploading(true);
-        try {
-            const fd = new FormData();
-            fd.append('type', 'moment');
-            fd.append('id', m.id);
-            files.forEach(f => fd.append('files[]', f));
-            await api.post('/photos', fd);
-            await refresh('moments', 'stats');
-        } catch (e) {
-            setError(e.message || 'Nahrávanie zlyhalo.');
-        } finally {
-            setUploading(false);
+        setProgress({ done: 0, total: files.length });
+        let failed = 0;
+        // po jednej — vidno priebeh a nenarazíme na PHP limity pri desiatkach fotiek
+        for (let i = 0; i < files.length; i++) {
+            try {
+                const fd = new FormData();
+                fd.append('type', 'moment');
+                fd.append('id', m.id);
+                fd.append('files[]', files[i]);
+                await api.post('/photos', fd);
+            } catch {
+                failed++;
+            }
+            setProgress({ done: i + 1, total: files.length });
         }
+        if (failed) setError(`${failed} ${failed === 1 ? 'fotka sa nenahrala' : 'fotky sa nenahrali'} — skús znova.`);
+        await refresh('moments', 'stats');
+        setProgress(null);
     };
 
     const share = async () => {
@@ -226,11 +238,20 @@ export default function MomentDetail({ slug, onBack, navigate }) {
                     {/* Pridať fotku CTA */}
                     <div className="card tint" style={{ marginTop: 16, padding: 14 }}>
                         <div className="row between">
-                            <div className="col gap-2">
+                            <div className="col gap-2 grow">
                                 <div className="eyebrow" style={{ color: 'var(--green)' }}>k tomuto momentu</div>
                                 <div style={{ fontSize: 14, fontWeight: 500 }}>
-                                    {uploading ? 'nahrávam fotky…' : 'Pridať ďalšiu fotku'}
+                                    {uploading ? `nahrávam ${progress.done} / ${progress.total}` : 'Pridať ďalšiu fotku'}
                                 </div>
+                                {uploading && (
+                                    <div style={{ height: 5, borderRadius: 3, background: 'var(--green-line)', overflow: 'hidden', marginTop: 6 }}>
+                                        <div style={{
+                                            width: `${Math.round(progress.done / progress.total * 100)}%`,
+                                            height: '100%', background: 'var(--green)',
+                                            transition: 'width 300ms ease',
+                                        }} />
+                                    </div>
+                                )}
                             </div>
                             <button className="icon-btn green" disabled={uploading}
                                 style={{ opacity: uploading ? 0.45 : 1 }}
@@ -326,6 +347,7 @@ export default function MomentDetail({ slug, onBack, navigate }) {
                     onClose={() => setLightbox(null)}
                     onTogglePin={togglePin}
                     onDelete={deletePhoto}
+                    onSetCover={setCover}
                 />
             )}
 
@@ -352,8 +374,17 @@ export default function MomentDetail({ slug, onBack, navigate }) {
                         <div className="col grow" style={{ minWidth: 0 }}>
                             <div className="eyebrow">{m.title}</div>
                             <div style={{ fontSize: 16, fontWeight: 500 }}>
-                                {uploading ? 'nahrávam fotky…' : `všetky fotky · ${photosCount}`}
+                                {uploading ? `nahrávam ${progress.done} / ${progress.total}` : `všetky fotky · ${photosCount}`}
                             </div>
+                            {uploading && (
+                                <div style={{ height: 4, borderRadius: 2, background: 'var(--green-line)', overflow: 'hidden', marginTop: 5 }}>
+                                    <div style={{
+                                        width: `${Math.round(progress.done / progress.total * 100)}%`,
+                                        height: '100%', background: 'var(--green)',
+                                        transition: 'width 300ms ease',
+                                    }} />
+                                </div>
+                            )}
                         </div>
                         <button className="icon-btn green" disabled={uploading} style={{ flexShrink: 0, opacity: uploading ? 0.45 : 1 }}
                             onClick={() => fileRef.current?.click()}>{Icons.plus}</button>

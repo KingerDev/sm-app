@@ -9,11 +9,12 @@ use Illuminate\Support\Facades\Storage;
 class Photo extends Model
 {
     protected $fillable = [
-        'photoable_type', 'photoable_id', 'path', 'thumb_path', 'is_pinned', 'taken_at', 'sort_order',
+        'photoable_type', 'photoable_id', 'path', 'thumb_path', 'is_pinned', 'is_cover', 'taken_at', 'sort_order',
     ];
 
     protected $casts = [
         'is_pinned' => 'boolean',
+        'is_cover'  => 'boolean',
         'taken_at'  => 'date',
     ];
 
