@@ -32,7 +32,7 @@ class ApiTest extends TestCase
         ])->assertOk();
 
         $this->getJson('/api/v1/stats')->assertOk()->assertJsonStructure([
-            'days_together', 'photos', 'km', 'countries', 'cities', 'bucket_done', 'bucket_total',
+            'days_together', 'photos', 'countries', 'cities', 'bucket_done', 'bucket_total',
         ]);
     }
 
@@ -45,7 +45,6 @@ class ApiTest extends TestCase
             'place'      => 'Viedeň · Rakúsko',
             'date_start' => '2026-04-12',
             'date_end'   => '2026-04-14',
-            'tags'       => ['cestovanie'],
             'who'        => 'S',
         ])->assertCreated();
 

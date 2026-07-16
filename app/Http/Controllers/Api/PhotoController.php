@@ -54,17 +54,38 @@ class PhotoController extends Controller
         return response()->json($photo);
     }
 
-    /** Nastaví fotku ako titulnú (cover) — ostatným fotkám momentu/kapsuly sa zruší. */
-    public function setCover(int $id): JsonResponse
+    /**
+     * Nastaví fotku ako titulnú (cover) — ostatným fotkám momentu/kapsuly sa zruší.
+     * Voliteľný `file` je orezaný výrez z editora — uloží sa samostatne,
+     * originál fotky zostáva nedotknutý.
+     */
+    public function setCover(Request $request, int $id): JsonResponse
     {
+        $request->validate(['file' => 'nullable|file|image|max:40960']);
+
         $photo = Photo::findOrFail($id);
 
+        // ostatné fotky prídu o cover aj o uložený výrez
         Photo::where('photoable_type', $photo->photoable_type)
             ->where('photoable_id', $photo->photoable_id)
             ->where('id', '!=', $photo->id)
-            ->update(['is_cover' => false]);
+            ->where(fn ($q) => $q->where('is_cover', true)->orWhereNotNull('cover_path'))
+            ->get()
+            ->each(function (Photo $other) {
+                Images::delete($other->cover_path, $other->cover_thumb_path);
+                $other->update(['is_cover' => false, 'cover_path' => null, 'cover_thumb_path' => null]);
+            });
 
-        $photo->update(['is_cover' => true]);
+        $data = ['is_cover' => true];
+
+        if ($file = $request->file('file')) {
+            Images::delete($photo->cover_path, $photo->cover_thumb_path);
+            $stored = Images::store($file, 'photos/covers');
+            $data['cover_path'] = $stored['path'];
+            $data['cover_thumb_path'] = $stored['thumb_path'];
+        }
+
+        $photo->update($data);
 
         return response()->json($photo);
     }

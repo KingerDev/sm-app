@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\CapsuleController;
 use App\Http\Controllers\Api\CountryController;
 use App\Http\Controllers\Api\EventController;
 use App\Http\Controllers\Api\MomentController;
+use App\Http\Controllers\Api\NoteController;
 use App\Http\Controllers\Api\PhotoController;
 use App\Http\Controllers\Api\SettingsController;
 use App\Http\Controllers\Api\StatsController;
@@ -31,9 +32,16 @@ Route::prefix('v1')->group(function () {
         Route::patch('/moments/{slug}', [MomentController::class, 'update']);
         Route::delete('/moments/{slug}', [MomentController::class, 'destroy']);
 
+        Route::get('/notes', [NoteController::class, 'index']);
+        Route::post('/notes', [NoteController::class, 'store']);
+        // POST kvôli multipart uploadu fotky (PHP nespracuje súbory v PATCH)
+        Route::match(['patch', 'post'], '/notes/{id}', [NoteController::class, 'update'])->whereNumber('id');
+        Route::delete('/notes/{id}', [NoteController::class, 'destroy']);
+
         Route::post('/photos', [PhotoController::class, 'store']);
         Route::patch('/photos/{id}/pin', [PhotoController::class, 'togglePin']);
-        Route::patch('/photos/{id}/cover', [PhotoController::class, 'setCover']);
+        // POST kvôli multipart uploadu výrezu (PHP nespracuje súbory v PATCH)
+        Route::match(['patch', 'post'], '/photos/{id}/cover', [PhotoController::class, 'setCover']);
         Route::delete('/photos/{id}', [PhotoController::class, 'destroy']);
 
         Route::get('/bucket', [BucketController::class, 'index']);

@@ -1,10 +1,12 @@
 // GALLERY screen (V4-based) — Timeline / Albums / Places views
 
-const Gallery = ({ navigate }) => {
+const Gallery = ({ navigate, notes = [] }) => {
   const [view, setView] = React.useState('timeline');
 
   // Build a timeline grouped by year, with milestones interleaved.
+  // Momentky (micro-notes) sit at the top — they're the most recent, everyday entries.
   const items = [
+    ...notes.map(n => ({ type: 'note', note: n })),
     { type: 'milestone', date: 'máj 2026', title: 'Štátnice spolu', sub: 'urobili sme to' },
     { type: 'moment', mom: MOMENTS.find(m => m.id === 'wien-26') },
     { type: 'moment', mom: MOMENTS.find(m => m.id === 'statnice') },
@@ -78,17 +80,32 @@ const Gallery = ({ navigate }) => {
               {items.map((it, i) => (
                 <div key={i} style={{ position: 'relative' }}>
                   <div style={{
-                    position: 'absolute', left: -28, top: 10,
-                    width: 17, height: 17, borderRadius: '50%',
-                    background: it.type === 'milestone' ? 'var(--green)' : 'var(--surface)',
+                    position: 'absolute', left: it.type === 'note' ? -27 : -28, top: it.type === 'note' ? 11 : 10,
+                    width: it.type === 'note' ? 15 : 17, height: it.type === 'note' ? 15 : 17, borderRadius: '50%',
+                    background: it.type === 'milestone' ? 'var(--green)' : it.type === 'note' ? 'var(--green-soft)' : 'var(--surface)',
                     border: '1.5px solid var(--green)',
                     boxShadow: '0 0 0 4px var(--paper)',
-                    display: 'grid', placeItems: 'center', color: 'var(--paper)', fontSize: 9,
+                    display: 'grid', placeItems: 'center', color: it.type === 'note' ? 'var(--green)' : 'var(--paper)', fontSize: it.type === 'note' ? 8 : 9,
                   }}>
                     {it.type === 'milestone' && '♥'}
+                    {it.type === 'note' && '✎'}
                   </div>
 
-                  {it.type === 'milestone' ? (
+                  {it.type === 'note' ? (
+                    <button onClick={() => navigate('momentka:' + it.note.id)} style={{
+                      display: 'flex', gap: 12, alignItems: 'center', width: '100%', textAlign: 'left', font: 'inherit', color: 'inherit',
+                      cursor: 'pointer', border: 'none',
+                      background: 'var(--green-soft)', borderRadius: 14, padding: 11,
+                    }}>
+                      {it.note.seed && <Photo seed={it.note.seed} style={{ width: 76, height: 76, borderRadius: 10, flexShrink: 0 }} />}
+                      <div className="col" style={{ gap: 6, minWidth: 0 }}>
+                        <div style={{ fontSize: 13.5, lineHeight: 1.5, color: 'var(--ink)' }}>{it.note.text}</div>
+                        <div className="eyebrow" style={{ color: 'var(--green)' }}>
+                          {it.note.dateShort} · {it.note.who} · chvíľka
+                        </div>
+                      </div>
+                    </button>
+                  ) : it.type === 'milestone' ? (
                     <div className="card tint" style={{ padding: 14 }}>
                       <div className="eyebrow" style={{ color: 'var(--green)' }}>{it.date} · míľnik</div>
                       <div className="serif" style={{ fontSize: 24, fontWeight: 600, color: 'var(--green-deep)', marginTop: 2 }}>

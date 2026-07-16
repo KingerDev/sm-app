@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\DB;
 
 class SettingsController extends Controller
 {
-    private const EDITABLE = ['together_since', 'total_photos', 'total_km', 'mascot_variant'];
+    private const EDITABLE = ['together_since', 'total_photos', 'mascot_variant'];
 
     public function index(): JsonResponse
     {

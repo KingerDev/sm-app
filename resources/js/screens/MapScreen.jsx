@@ -2,7 +2,7 @@
 import { cloneElement, useState } from 'react';
 import { api } from '../api';
 import { useStore } from '../store';
-import { AppHeader, Icons, Photo, Sheet } from '../components/shell';
+import { AppHeader, Icons, Photo, Sheet, coverSrc } from '../components/shell';
 import RealMap from '../components/RealMap';
 
 const cityWord = (n) => n === 1 ? 'mesto' : n < 5 ? 'mestá' : 'miest';
@@ -113,8 +113,8 @@ export default function MapScreen({ navigate }) {
                     <RealMap markers={pins} height={220} />
                 </div>
 
-                {/* Stats trio */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginTop: 14 }}>
+                {/* Stats duo */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10, marginTop: 14 }}>
                     <div className="card" style={{ padding: 14, alignItems: 'center', textAlign: 'center', display: 'flex', flexDirection: 'column' }}>
                         <div className="num" style={{ fontSize: 32, color: 'var(--green)' }}>{stats?.countries ?? 0}</div>
                         <div className="eyebrow" style={{ fontSize: 9.5 }}>krajín</div>
@@ -122,10 +122,6 @@ export default function MapScreen({ navigate }) {
                     <div className="card" style={{ padding: 14, alignItems: 'center', textAlign: 'center', display: 'flex', flexDirection: 'column' }}>
                         <div className="num" style={{ fontSize: 32, color: 'var(--green)' }}>{stats?.cities ?? 0}</div>
                         <div className="eyebrow" style={{ fontSize: 9.5 }}>miest</div>
-                    </div>
-                    <div className="card" style={{ padding: 14, alignItems: 'center', textAlign: 'center', display: 'flex', flexDirection: 'column' }}>
-                        <div className="num" style={{ fontSize: 32, color: 'var(--green)' }}>{(stats?.km ?? 0).toLocaleString('sk-SK')}</div>
-                        <div className="eyebrow" style={{ fontSize: 9.5 }}>km</div>
                     </div>
                 </div>
 
@@ -433,7 +429,7 @@ function CountryDetail({ country, onClose, navigate }) {
                                             border: '0.5px solid var(--line)', cursor: 'pointer', alignItems: 'center',
                                             background: 'var(--surface)', font: 'inherit', color: 'inherit',
                                         }}>
-                                        <Photo seed={m.seed} url={m.photos?.[0]?.thumb_url || m.photos?.[0]?.url}
+                                        <Photo seed={m.seed} url={coverSrc(m)}
                                             style={{ width: 60, height: 60, borderRadius: 12, flexShrink: 0 }} />
                                         <div className="col grow" style={{ minWidth: 0, gap: 3 }}>
                                             <div style={{ fontSize: 14, fontWeight: 500 }}>{m.title}</div>

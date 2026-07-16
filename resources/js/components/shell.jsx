@@ -1,4 +1,5 @@
 // Zdieľané shell komponenty (podľa design/hifi-shell.jsx)
+import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 const ico = (paths) => <svg viewBox="0 0 24 24" className="ico">{paths}</svg>;
@@ -88,6 +89,16 @@ export const PALETTES = {
     default: ['#c2d4c8', '#5a7062'],
 };
 
+// Titulná fotka momentu/kapsuly — preferuje uložený výrez z editora (cover_*),
+// inak originál. photos[0] je vždy cover (API radí is_cover prvú).
+export const coverSrc = (entity, { full = false } = {}) => {
+    const p = entity?.photos?.[0];
+    if (!p) return undefined;
+    return full
+        ? (p.cover_url || p.url)
+        : (p.cover_thumb_url || p.thumb_url || p.url);
+};
+
 export const photoUrl = ({ url, seed = 'default', index = 0, w = 600, h = 400 }) => {
     if (url) return url;
     return `https://picsum.photos/seed/sm-${seed}-${index}/${Math.round(w)}/${Math.round(h)}`;
@@ -138,15 +149,41 @@ export const ProgressBar = ({ value }) => (
 // ---- Bottom sheet ----
 // Portál na .app-frame — sheet musí prekryť aj tab bar (screen-content má
 // vlastný stacking context kvôli animácii, z-index by nestačil).
-export const Sheet = ({ onClose, children }) => createPortal(
-    <div className="sheet-backdrop" onClick={onClose}>
-        <div className="sheet" onClick={(e) => e.stopPropagation()}>
-            <div className="sheet-handle" />
-            {children}
-        </div>
-    </div>,
-    document.querySelector('.app-frame') || document.body
-);
+// Na mobile sa sheet zdvihne nad softvérovú klávesnicu (visualViewport).
+export const Sheet = ({ onClose, children }) => {
+    const [kb, setKb] = useState(0);
+
+    useEffect(() => {
+        const vv = window.visualViewport;
+        if (!vv) return;
+        const update = () => {
+            // výška klávesnice = layout viewport mínus viditeľný viewport
+            setKb(Math.max(0, window.innerHeight - vv.height - vv.offsetTop));
+        };
+        update();
+        vv.addEventListener('resize', update);
+        vv.addEventListener('scroll', update);
+        return () => {
+            vv.removeEventListener('resize', update);
+            vv.removeEventListener('scroll', update);
+        };
+    }, []);
+
+    return createPortal(
+        <div className="sheet-backdrop" onClick={onClose}>
+            <div className="sheet" onClick={(e) => e.stopPropagation()}
+                style={kb > 0 ? {
+                    marginBottom: kb,
+                    maxHeight: `calc(100% - ${kb + 24}px)`,
+                    transition: 'margin-bottom 150ms ease',
+                } : undefined}>
+                <div className="sheet-handle" />
+                {children}
+            </div>
+        </div>,
+        document.querySelector('.app-frame') || document.body
+    );
+};
 
 // ---- Zdieľané inline štýly ----
 export const iconBg = {

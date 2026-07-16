@@ -10,11 +10,10 @@ class Moment extends Model
     protected $fillable = [
         'slug', 'title', 'place', 'place_short',
         'date_start', 'date_end', 'date_display', 'date_short',
-        'tags', 'photos_count', 'pinned_count', 'who', 'seed', 'description', 'sort_order',
+        'photos_count', 'pinned_count', 'who', 'seed', 'description', 'sort_order',
     ];
 
     protected $casts = [
-        'tags'     => 'array',
         'is_done'  => 'boolean',
         'date_start' => 'date',
         'date_end'   => 'date',

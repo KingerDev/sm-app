@@ -10,6 +10,7 @@ import MapScreen from '../screens/MapScreen';
 import Stats from '../screens/Stats';
 import MomentDetail from '../screens/MomentDetail';
 import { MomentForm, MomentSearch } from '../screens/MomentForm';
+import Momentka from '../screens/Momentka';
 import Calendar from '../screens/Calendar';
 import CapsuleScreen from '../screens/Capsule';
 import Wrapped, { monthlySlidesFor } from '../screens/Wrapped';
@@ -70,6 +71,12 @@ export default function App() {
         }
         if (overlay.startsWith('moment-edit:')) {
             return <MomentForm slug={overlay.slice(12)} onBack={close} navigate={navigate} />;
+        }
+        if (overlay === 'momentka-add') {
+            return <Momentka onBack={close} />;
+        }
+        if (overlay.startsWith('momentka:')) {
+            return <Momentka id={overlay.slice(9)} onBack={close} />;
         }
         if (overlay === 'moment-search') {
             return <MomentSearch onBack={close} navigate={navigate} />;

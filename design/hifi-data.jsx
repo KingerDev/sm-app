@@ -92,6 +92,17 @@ const MOMENTS = [
   },
 ];
 
+// Momentky — micro-notes for ordinary days. No place / tags / photos, they don't
+// feed the Map or Stats. Just a quick line to remember a small everyday moment.
+const SK_MONTHS = ['jan', 'feb', 'mar', 'apr', 'máj', 'jún', 'júl', 'aug', 'sep', 'okt', 'nov', 'dec'];
+const formatShortSk = (d) => `${d.getDate()}. ${SK_MONTHS[d.getMonth()]}`;
+
+const NOTES = [
+  { id: 'note-1', text: 'Zmokli sme cestou z obchodu — dážď z ničoho nič. Bežali sme a smiali sa celú cestu domov.', dateShort: '13. máj', who: 'spolu', seed: 'road' },
+  { id: 'note-2', text: 'Ranná káva na balkóne, prvý naozaj teplý deň. Ticho a vrabce.', dateShort: '9. máj', who: 'S' },
+  { id: 'note-3', text: 'M spravila palacinky o polnoci, lebo „prečo nie". Najlepšie rozhodnutie týždňa.', dateShort: '2. máj', who: 'M' },
+];
+
 const BUCKET_CATEGORIES = [
   { id: 'travel', icon: '✈', name: 'Cestovanie', done: 6, total: 14, color: '#2d5a3d' },
   { id: 'food', icon: '◉', name: 'Jedlo', done: 4, total: 9, color: '#2d5a3d' },
@@ -169,5 +180,5 @@ const STATS = {
 
 Object.assign(window, {
   TOGETHER_SINCE, TODAY, DAYS_TOGETHER,
-  MOMENTS, BUCKET_CATEGORIES, BUCKET_ITEMS, COUNTRIES, STATS,
+  MOMENTS, NOTES, formatShortSk, BUCKET_CATEGORIES, BUCKET_ITEMS, COUNTRIES, STATS,
 });

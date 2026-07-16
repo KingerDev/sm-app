@@ -65,12 +65,13 @@ export default function Lightbox({ items, index, onClose, onTogglePin, onDelete,
                 <div className="row gap-8">
                     {photo.real && onSetCover && (
                         photo.cover ? (
-                            <span style={{
+                            <button onClick={() => onSetCover(photo)} title="upraviť výrez titulnej" style={{
+                                border: 'none', cursor: 'pointer', font: 'inherit',
                                 alignSelf: 'center', fontSize: 10.5, letterSpacing: 1,
                                 textTransform: 'uppercase', color: 'rgba(255,255,255,0.8)',
                                 background: 'rgba(250,250,247,0.14)', padding: '6px 10px',
                                 borderRadius: 999, backdropFilter: 'blur(6px)',
-                            }}>titulná ✓</span>
+                            }}>titulná ✓ · výrez</button>
                         ) : (
                             <button onClick={() => onSetCover(photo)} style={{
                                 border: 'none', cursor: 'pointer', font: 'inherit',

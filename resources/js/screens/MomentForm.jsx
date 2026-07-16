@@ -2,11 +2,9 @@
 import { cloneElement, useRef, useState } from 'react';
 import { api, ApiError } from '../api';
 import { useStore } from '../store';
-import { Icons, Photo, Sheet } from '../components/shell';
+import { Icons, Photo, Sheet, coverSrc } from '../components/shell';
 import PhotoEditor from '../components/PhotoEditor';
 import { toInputDate } from '../lib/dates';
-
-const ALL_TAGS = ['cestovanie', 'jedlo', 'zážitky', 'my dvaja', 'rodina'];
 
 const mInputBase = {
     width: '100%', font: 'inherit', fontSize: 15, color: 'var(--ink)',
@@ -23,7 +21,6 @@ export function MomentForm({ slug, onBack, navigate }) {
     const edit = !!moment;
 
     const defaultWho = user?.name === 'S' || user?.name === 'M' ? user.name : 'spolu';
-    const presetCustom = edit ? (moment.tags || []).filter(t => !ALL_TAGS.includes(t)) : [];
 
     // "Viedeň · Rakúsko" → mesto + krajina (pre prepojenie s mapou)
     const parsePlace = (label) => {
@@ -41,9 +38,6 @@ export function MomentForm({ slug, onBack, navigate }) {
     const [multiDay, setMultiDay] = useState(edit && !!moment.date_end);
     const [who, setWho] = useState(edit ? moment.who : defaultWho);
     const [placeSheet, setPlaceSheet] = useState(false);
-    const [tags, setTags] = useState(edit ? (moment.tags || []) : []);
-    const [customTags, setCustomTags] = useState(presetCustom);
-    const [newTag, setNewTag] = useState('');
     const [note, setNote] = useState(edit ? (moment.description || '') : '');
     const [files, setFiles] = useState([]); // { file, url }
     const [editIndex, setEditIndex] = useState(null); // index fotky v editore
@@ -53,16 +47,6 @@ export function MomentForm({ slug, onBack, navigate }) {
     const fileRef = useRef(null);
 
     if (slug && !moment) return null;
-
-    const toggleTag = (t) => setTags(tags.includes(t) ? tags.filter(x => x !== t) : [...tags, t]);
-    const addCustomTag = () => {
-        const v = newTag.trim().toLowerCase();
-        if (!v) return;
-        const all = [...ALL_TAGS, ...customTags];
-        if (!all.includes(v)) setCustomTags([...customTags, v]);
-        if (!tags.includes(v)) setTags([...tags, v]);
-        setNewTag('');
-    };
 
     const pickFiles = (list) => {
         const picked = Array.from(list || []).map(f => ({ file: f, url: URL.createObjectURL(f) }));
@@ -85,7 +69,6 @@ export function MomentForm({ slug, onBack, navigate }) {
                 place: place.trim(),
                 date_start: dateStart,
                 date_end: multiDay && dateEnd ? dateEnd : null,
-                tags,
                 who,
                 description: note.trim() || null,
             };
@@ -154,7 +137,7 @@ export function MomentForm({ slug, onBack, navigate }) {
                 {/* Fotky */}
                 {edit ? (
                     <div style={{ position: 'relative', marginBottom: files.length ? 10 : 20 }}>
-                        <Photo seed={moment.seed} url={moment.photos?.[0]?.url} style={{ height: 150, borderRadius: 16 }} />
+                        <Photo seed={moment.seed} url={coverSrc(moment, { full: true })} style={{ height: 150, borderRadius: 16 }} />
                         <div style={{
                             position: 'absolute', inset: 0, borderRadius: 16,
                             background: 'linear-gradient(transparent 40%, rgba(0,0,0,0.4))',
@@ -261,33 +244,6 @@ export function MomentForm({ slug, onBack, navigate }) {
                             color: who === w ? 'var(--paper)' : 'var(--muted)',
                         }}>{w}</button>
                     ))}
-                </div>
-
-                {/* Štítky */}
-                <div className="eyebrow" style={{ marginBottom: 10 }}>štítky</div>
-                <div className="row gap-6 wrap" style={{ marginBottom: 10 }}>
-                    {[...ALL_TAGS, ...customTags].map(t => (
-                        <button key={t} onClick={() => toggleTag(t)}
-                            className={'chip' + (tags.includes(t) ? ' green' : '')}
-                            style={{ cursor: 'pointer', border: 'none', font: 'inherit' }}>{t}</button>
-                    ))}
-                </div>
-                <div className="row gap-8" style={{ marginBottom: 18 }}>
-                    <input value={newTag}
-                        onChange={e => setNewTag(e.target.value)}
-                        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addCustomTag(); } }}
-                        placeholder="nový štítok…"
-                        style={{ ...mInputBase, fontSize: 14, padding: '10px 13px' }} />
-                    <button className="btn" onClick={addCustomTag} disabled={!newTag.trim()}
-                        style={{
-                            flexShrink: 0, padding: '10px 16px', gap: 6,
-                            color: 'var(--green)', borderColor: 'var(--green-line)',
-                            background: 'var(--green-soft)',
-                            opacity: newTag.trim() ? 1 : 0.45,
-                            cursor: newTag.trim() ? 'pointer' : 'default',
-                        }}>
-                        {cloneElement(Icons.plus, { style: { width: 15, height: 15 } })} pridať
-                    </button>
                 </div>
 
                 {/* Poznámka */}
@@ -506,18 +462,14 @@ const PlacePicker = ({ current, countries, moments, onClose, onPick }) => {
 export function MomentSearch({ onBack, navigate }) {
     const { moments } = useStore();
     const [q, setQ] = useState('');
-    const [activeTag, setActiveTag] = useState(null);
 
     const query = q.trim().toLowerCase();
-    const results = moments.filter(m => {
-        const matchesQ = !query ||
-            m.title.toLowerCase().includes(query) ||
-            (m.place || '').toLowerCase().includes(query) ||
-            (m.description || '').toLowerCase().includes(query) ||
-            (m.tags || []).some(t => t.toLowerCase().includes(query));
-        const matchesTag = !activeTag || (m.tags || []).includes(activeTag);
-        return matchesQ && matchesTag;
-    });
+    const results = moments.filter(m =>
+        !query ||
+        m.title.toLowerCase().includes(query) ||
+        (m.place || '').toLowerCase().includes(query) ||
+        (m.description || '').toLowerCase().includes(query)
+    );
 
     const suggestions = ['Viedeň', 'Tatry', 'výročie', 'koncert'];
 
@@ -547,18 +499,9 @@ export function MomentSearch({ onBack, navigate }) {
                 </div>
             </div>
 
-            {/* Filtre podľa štítkov */}
-            <div className="row gap-6 wrap" style={{ padding: '0 16px 12px' }}>
-                {ALL_TAGS.map(t => (
-                    <button key={t} onClick={() => setActiveTag(activeTag === t ? null : t)}
-                        className={'chip' + (activeTag === t ? ' green' : '')}
-                        style={{ cursor: 'pointer', border: 'none', font: 'inherit' }}>{t}</button>
-                ))}
-            </div>
-
             <div className="scroll" style={{ flex: 1, paddingTop: 4 }}>
                 {/* Návrhy pri prázdnom hľadaní */}
-                {!query && !activeTag && (
+                {!query && (
                     <div style={{ marginBottom: 18 }}>
                         <div className="eyebrow" style={{ marginBottom: 10 }}>skús hľadať</div>
                         <div className="row gap-6 wrap">
@@ -581,7 +524,7 @@ export function MomentSearch({ onBack, navigate }) {
                         <div className="handwritten" style={{ fontSize: 22, color: 'var(--muted)' }}>
                             nič sme nenašli
                         </div>
-                        <div style={{ fontSize: 12.5, color: 'var(--muted-2)' }}>skús iné slovo alebo štítok</div>
+                        <div style={{ fontSize: 12.5, color: 'var(--muted-2)' }}>skús iné slovo</div>
                     </div>
                 ) : (
                     <div className="col gap-10">
@@ -593,15 +536,12 @@ export function MomentSearch({ onBack, navigate }) {
                                     background: 'var(--surface)', font: 'inherit', color: 'inherit',
                                     alignItems: 'center',
                                 }}>
-                                <Photo seed={m.seed} url={m.photos?.[0]?.thumb_url || m.photos?.[0]?.url}
+                                <Photo seed={m.seed} url={coverSrc(m)}
                                     style={{ width: 64, height: 64, borderRadius: 12, flexShrink: 0 }} />
                                 <div className="col grow" style={{ minWidth: 0, gap: 3 }}>
                                     <div style={{ fontSize: 14.5, fontWeight: 500 }}>{m.title}</div>
                                     <div className="eyebrow" style={{ textTransform: 'none', letterSpacing: 0 }}>
                                         {m.date_short} · 📍 {m.place_short}
-                                    </div>
-                                    <div className="row gap-4 wrap" style={{ marginTop: 2 }}>
-                                        {(m.tags || []).map(t => <span key={t} className="chip" style={{ fontSize: 9.5, padding: '2px 7px' }}>{t}</span>)}
                                     </div>
                                 </div>
                                 <span style={{ color: 'var(--muted-2)', flexShrink: 0 }}>

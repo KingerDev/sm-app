@@ -29,6 +29,7 @@
 <script type="text/babel" src="hifi-stats.jsx"></script>
 <script type="text/babel" src="hifi-moment.jsx"></script>
 <script type="text/babel" src="hifi-moment-io.jsx"></script>
+<script type="text/babel" src="hifi-momentka.jsx"></script>
 <script type="text/babel" src="hifi-calendar.jsx"></script>
 
 <script type="text/babel" data-presets="env,react">
@@ -40,7 +41,15 @@ const App = () => {
   // Route: tab id | overlay 'moment:<id>' | 'wrapped' | 'capsule'
   const [tab, setTab] = React.useState('home');
   const [overlay, setOverlay] = React.useState(null);
+  const [notes, setNotes] = React.useState(NOTES);
   const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+
+  const addNote = (text, seed = null, who = 'spolu') =>
+    setNotes(ns => [{ id: 'note-' + Date.now(), text, who, seed, dateShort: formatShortSk(TODAY) }, ...ns]);
+  const saveNote = (obj) =>
+    setNotes(ns => [{ id: 'note-' + Date.now(), ...obj }, ...ns]);
+  const updateNote = (id, obj) => setNotes(ns => ns.map(n => n.id === id ? { ...n, ...obj } : n));
+  const deleteNote = (id) => setNotes(ns => ns.filter(n => n.id !== id));
 
   const navigate = (target) => {
     if (target.startsWith('moment:')) {
@@ -51,6 +60,10 @@ const App = () => {
       setOverlay(target);
     } else if (target === 'moment-add') {
       setOverlay('moment-add');
+    } else if (target === 'momentka-add') {
+      setOverlay('momentka-add');
+    } else if (target.startsWith('momentka:')) {
+      setOverlay(target);
     } else if (target === 'moment-search') {
       setOverlay('moment-search');
     } else if (target === 'calendar') {
@@ -65,9 +78,9 @@ const App = () => {
 
   const renderTab = () => {
     switch (tab) {
-      case 'home': return <Home navigate={navigate} mascotVariant={t.mascot} key="home" />;
+      case 'home': return <Home navigate={navigate} mascotVariant={t.mascot} notes={notes} onAddNote={addNote} key="home" />;
       case 'bucket': return <Bucket navigate={navigate} key="bucket" />;
-      case 'gallery': return <Gallery navigate={navigate} key="gallery" />;
+      case 'gallery': return <Gallery navigate={navigate} notes={notes} key="gallery" />;
       case 'map': return <MapScreen navigate={navigate} key="map" />;
       case 'stats': return <Stats navigate={navigate} key="stats" />;
       default: return null;
@@ -102,6 +115,32 @@ const App = () => {
             <MomentDetail id={overlay.slice(7)} onBack={() => setOverlay(null)} />
           </div>
         )}
+
+        {/* Nová / uprav momentka overlay */}
+        {overlay === 'momentka-add' && (
+          <div style={{
+            position: 'absolute', inset: 0, background: 'var(--paper)', zIndex: 22,
+            display: 'flex', flexDirection: 'column', animation: 'slideUp 320ms ease both',
+          }}>
+            <MomentkaEdit onBack={() => setOverlay(null)}
+              onSave={(obj) => { saveNote(obj); setOverlay(null); }} />
+          </div>
+        )}
+        {overlay && overlay.startsWith('momentka:') && (() => {
+          const id = overlay.slice(9);
+          const note = notes.find(n => n.id === id);
+          if (!note) return null;
+          return (
+            <div style={{
+              position: 'absolute', inset: 0, background: 'var(--paper)', zIndex: 22,
+              display: 'flex', flexDirection: 'column', animation: 'slideUp 320ms ease both',
+            }}>
+              <MomentkaEdit note={note} onBack={() => setOverlay(null)}
+                onSave={(obj) => { updateNote(id, obj); setOverlay(null); }}
+                onDelete={() => { deleteNote(id); setOverlay(null); }} />
+            </div>
+          );
+        })()}
 
         {/* Nový moment overlay */}
         {overlay === 'moment-add' && (

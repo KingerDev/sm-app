@@ -1,0 +1,49 @@
+<?php
+
+namespace App\Models;
+
+use App\Support\SkDate;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Storage;
+
+/** Momentka („chvíľka") — mikro-poznámka z bežného dňa, voliteľne s fotkou. */
+class Note extends Model
+{
+    protected $fillable = [
+        'text', 'who', 'date', 'photo_path', 'photo_thumb_path',
+    ];
+
+    protected $casts = [
+        'date' => 'date',
+    ];
+
+    protected $appends = ['date_short', 'photo_url', 'photo_thumb_url'];
+
+    /** "13. máj" (rok len ak nie je aktuálny) */
+    public function getDateShortAttribute(): string
+    {
+        $d = $this->date;
+        $label = $d->day.'. '.SkDate::MONTHS_SHORT[$d->month];
+
+        return $d->year === now()->year ? $label : $label.' '.$d->year;
+    }
+
+    public function getPhotoUrlAttribute(): ?string
+    {
+        return $this->photo_path ? Storage::disk('public')->url($this->photo_path) : null;
+    }
+
+    public function getPhotoThumbUrlAttribute(): ?string
+    {
+        $path = $this->photo_thumb_path ?: $this->photo_path;
+
+        return $path ? Storage::disk('public')->url($path) : null;
+    }
+
+    protected static function booted(): void
+    {
+        static::deleting(function (Note $note) {
+            \App\Support\Images::delete($note->photo_path, $note->photo_thumb_path);
+        });
+    }
+}

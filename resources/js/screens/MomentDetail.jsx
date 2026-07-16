@@ -2,9 +2,10 @@
 import { cloneElement, useRef, useState } from 'react';
 import { api } from '../api';
 import { useStore } from '../store';
-import { Icons, Photo, Sheet, photoUrl } from '../components/shell';
+import { Icons, Photo, Sheet, coverSrc, photoUrl } from '../components/shell';
 import Lightbox from '../components/Lightbox';
 import PhotoEditor from '../components/PhotoEditor';
+import CoverPicker from '../components/CoverPicker';
 
 export default function MomentDetail({ slug, onBack, navigate }) {
     const { moments, refresh } = useStore();
@@ -14,6 +15,7 @@ export default function MomentDetail({ slug, onBack, navigate }) {
     const uploading = progress !== null;
     const [pending, setPending] = useState([]); // { file, url } — vybrané, ešte nenahraté
     const [editIndex, setEditIndex] = useState(null);
+    const [coverEdit, setCoverEdit] = useState(null); // { photo, file } — výber výrezu titulnej
     const [error, setError] = useState(null);
     const fileRef = useRef(null);
 
@@ -31,7 +33,8 @@ export default function MomentDetail({ slug, onBack, navigate }) {
     const pinnedItems = hasReal ? items.filter(p => p.pinned) : [];
     const pinnedCount = hasReal ? pinnedItems.length : (m.pinned_count || 0);
     const photosCount = hasReal ? items.length : (m.photos_count || 0);
-    const cover = hasReal ? real[0].url : null;
+    // photos[0] z API je vždy cover (radené is_cover prvé) — real je preradené podľa sort_order
+    const cover = hasReal ? coverSrc(m, { full: true }) : null;
 
     const wrap = (fn) => async (...args) => {
         setError(null);
@@ -44,9 +47,20 @@ export default function MomentDetail({ slug, onBack, navigate }) {
         await refresh('moments', 'stats');
     });
 
+    // Titulná fotka: najskôr otvor editor na výber výrezu (v kartách je obrázok menší),
+    // až po potvrdení sa výrez nahrá a fotka nastaví ako cover
     const setCover = wrap(async (photo) => {
         if (!photo.real) return;
-        await api.patch(`/photos/${photo.id}/cover`);
+        const blob = await (await fetch(photo.url)).blob();
+        const file = new File([blob], `titulna-${photo.id}.jpg`, { type: blob.type || 'image/jpeg' });
+        setLightbox(null);
+        setCoverEdit({ photo, file });
+    });
+
+    const saveCover = wrap(async (photo, edited) => {
+        const fd = new FormData();
+        fd.append('file', edited);
+        await api.post(`/photos/${photo.id}/cover`, fd);
         await refresh('moments');
     });
 
@@ -159,9 +173,7 @@ export default function MomentDetail({ slug, onBack, navigate }) {
                 </div>
 
                 <div style={{ padding: '18px 0' }}>
-                    {/* Štítky */}
                     <div className="row gap-6 wrap" style={{ marginTop: 4 }}>
-                        {(m.tags || []).map(t => <span key={t} className="chip soft">{t}</span>)}
                         <span className="chip">pridal/a {m.who}</span>
                     </div>
 
@@ -337,6 +349,20 @@ export default function MomentDetail({ slug, onBack, navigate }) {
                         />
                     )}
                 </div>
+            )}
+
+            {/* ---- Výber výrezu titulnej fotky — živý náhľad karty ---- */}
+            {coverEdit && (
+                <CoverPicker
+                    file={coverEdit.file}
+                    moment={m}
+                    onCancel={() => setCoverEdit(null)}
+                    onSave={(edited) => {
+                        const { photo } = coverEdit;
+                        setCoverEdit(null);
+                        saveCover(photo, edited);
+                    }}
+                />
             )}
 
             {/* ---- Lightbox ---- */}

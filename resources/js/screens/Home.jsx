@@ -1,11 +1,13 @@
 // Domov — „spolu už" + veľký počet dní + skratky + najnovší moment (podľa design/hifi-home.jsx)
+import { cloneElement, useRef, useState } from 'react';
+import { api } from '../api';
 import { useStore } from '../store';
-import { Icons, Photo, ProgressBar, iconBg } from '../components/shell';
+import { Icons, Photo, ProgressBar, coverSrc, iconBg } from '../components/shell';
 import Mascot from '../components/Mascot';
 import { daysUntil, durationSk, formatDateSk, formatDateShortSk, parseDate, today } from '../lib/dates';
 
 export default function Home({ navigate }) {
-    const { stats, settings, moments, capsules, events } = useStore();
+    const { stats, settings, moments, capsules, events, notes } = useStore();
 
     const m = moments[0]; // najnovší
     const nextCapsule = capsules
@@ -61,6 +63,9 @@ export default function Home({ navigate }) {
                 </div>
 
                 <div className="divider" style={{ margin: '4px 0 20px' }} />
+
+                {/* Momentka — rýchle zachytenie chvíľky z bežného dňa */}
+                <QuickNote recent={notes.slice(0, 2)} navigate={navigate} />
 
                 {/* Na dnes — najbližšia udalosť */}
                 {nextEvent && (
@@ -127,7 +132,7 @@ export default function Home({ navigate }) {
                         </div>
                         <div className="row gap-4">
                             {moments.slice(0, 4).map(mm => (
-                                <Photo key={mm.id} seed={mm.seed} url={mm.photos?.[0]?.thumb_url || mm.photos?.[0]?.url}
+                                <Photo key={mm.id} seed={mm.seed} url={coverSrc(mm)}
                                     style={{ width: 30, height: 30, borderRadius: 6 }} />
                             ))}
                         </div>
@@ -166,15 +171,12 @@ export default function Home({ navigate }) {
 
                         <button className="card flush" style={{ width: '100%', padding: 0, border: '0.5px solid var(--line)', cursor: 'pointer', background: 'var(--surface)' }}
                             onClick={() => navigate('moment:' + m.slug)}>
-                            <Photo seed={m.seed} url={m.photos?.[0]?.thumb_url || m.photos?.[0]?.url} style={{ height: 200, borderRadius: 0 }} />
+                            <Photo seed={m.seed} url={coverSrc(m)} style={{ height: 200, borderRadius: 0 }} />
                             <div className="col gap-6" style={{ padding: 14, textAlign: 'left' }}>
                                 <div className="row between">
                                     <div className="eyebrow">{m.date_short} · {m.place_short}</div>
                                 </div>
                                 <div style={{ fontSize: 17, fontWeight: 500 }}>{m.title}</div>
-                                <div className="row gap-6 wrap">
-                                    {(m.tags || []).map(t => <span key={t} className="chip soft">{t}</span>)}
-                                </div>
                             </div>
                         </button>
                     </>
@@ -224,6 +226,109 @@ export default function Home({ navigate }) {
         </>
     );
 }
+
+/* Rýchla chvíľka — text + voliteľná fotka, uloží sa hneď z Domova */
+const QuickNote = ({ recent, navigate }) => {
+    const { user, refresh } = useStore();
+    const [text, setText] = useState('');
+    const [file, setFile] = useState(null); // { file, url }
+    const [busy, setBusy] = useState(false);
+    const fileRef = useRef(null);
+
+    const defaultWho = user?.name === 'S' || user?.name === 'M' ? user.name : 'spolu';
+
+    const pickFile = (f) => {
+        if (!f) return;
+        if (file) URL.revokeObjectURL(file.url);
+        setFile({ file: f, url: URL.createObjectURL(f) });
+    };
+    const clearFile = () => {
+        if (file) URL.revokeObjectURL(file.url);
+        setFile(null);
+    };
+
+    const submit = async () => {
+        const v = text.trim();
+        if (!v || busy) return;
+        setBusy(true);
+        try {
+            const fd = new FormData();
+            fd.append('text', v);
+            fd.append('who', defaultWho);
+            if (file) fd.append('file', file.file);
+            await api.post('/notes', fd);
+            await refresh('notes');
+            clearFile();
+            setText('');
+        } catch {
+            alert('Chvíľka sa neuložila — skús znova.');
+        }
+        setBusy(false);
+    };
+
+    return (
+        <div style={{ marginBottom: 18 }}>
+            <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }}
+                onChange={(e) => { pickFile(e.target.files?.[0]); e.target.value = ''; }} />
+
+            <div className="row between" style={{ marginBottom: 10, alignItems: 'baseline' }}>
+                <div className="handwritten" style={{ fontSize: 22 }}>Dnešná chvíľka</div>
+                <button className="btn ghost" onClick={() => navigate('momentka-add')}
+                    style={{ padding: '2px 4px', fontSize: 12, color: 'var(--muted)' }}>podrobnejšie →</button>
+            </div>
+            {file && (
+                <div style={{ position: 'relative', marginBottom: 8, width: 'fit-content' }}>
+                    <Photo url={file.url} style={{ width: 74, height: 74, borderRadius: 12 }} />
+                    <button onClick={clearFile} style={{
+                        position: 'absolute', top: -6, right: -6, width: 22, height: 22, borderRadius: '50%',
+                        background: 'var(--ink)', color: 'var(--paper)', border: '2px solid var(--paper)',
+                        display: 'grid', placeItems: 'center', cursor: 'pointer', padding: 0,
+                    }}>{cloneElement(Icons.close, { style: { width: 12, height: 12 } })}</button>
+                </div>
+            )}
+            <div className="row gap-8" style={{ alignItems: 'stretch' }}>
+                <button className="icon-btn" onClick={() => fileRef.current?.click()} title="pridať fotku"
+                    style={{ flexShrink: 0, color: file ? 'var(--green)' : 'var(--muted)' }}>
+                    {cloneElement(Icons.img, { style: { width: 19, height: 19 } })}
+                </button>
+                <input value={text} onChange={e => setText(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); submit(); } }}
+                    placeholder="čo sa dnes stalo? napr. zmokli sme…"
+                    style={{
+                        flex: 1, font: 'inherit', fontSize: 14, color: 'var(--ink)',
+                        background: 'var(--surface)', border: '0.5px solid var(--line)',
+                        borderRadius: 12, padding: '12px 14px', outline: 'none', minWidth: 0,
+                    }} />
+                <button className="btn primary" onClick={submit} disabled={!text.trim() || busy}
+                    style={{ flexShrink: 0, padding: '0 16px', opacity: text.trim() && !busy ? 1 : 0.4, cursor: text.trim() && !busy ? 'pointer' : 'default' }}>
+                    {cloneElement(Icons.send, { style: { width: 18, height: 18 } })}
+                </button>
+            </div>
+            {recent.length > 0 && (
+                <div className="col gap-6" style={{ marginTop: 12 }}>
+                    {recent.map(n => (
+                        <button key={n.id} onClick={() => navigate('momentka:' + n.id)} className="row gap-10" style={{
+                            alignItems: 'flex-start', padding: '10px 13px', textAlign: 'left', width: '100%',
+                            background: 'var(--green-soft)', borderRadius: 12, border: 'none', font: 'inherit', color: 'inherit', cursor: 'pointer',
+                        }}>
+                            {n.photo_thumb_url
+                                ? <Photo url={n.photo_thumb_url} style={{ width: 40, height: 40, borderRadius: 9, flexShrink: 0 }} />
+                                : <span style={{ color: 'var(--green)', fontSize: 14, lineHeight: '19px', flexShrink: 0 }}>✎</span>}
+                            <div className="col" style={{ gap: 3, minWidth: 0 }}>
+                                <div style={{ fontSize: 13, lineHeight: 1.45 }}>{n.text}</div>
+                                <div className="eyebrow" style={{ color: 'var(--green)' }}>{n.date_short} · {n.who}</div>
+                            </div>
+                        </button>
+                    ))}
+                    <button className="btn ghost" onClick={() => navigate('gallery')}
+                        style={{ alignSelf: 'flex-start', padding: '2px 4px', fontSize: 12, color: 'var(--muted)' }}>
+                        všetky chvíľky v galérii →
+                    </button>
+                </div>
+            )}
+        </div>
+    );
+};
 
 const shortcutCard = {
     padding: 14,

@@ -13,7 +13,6 @@ class SettingsSeeder extends Seeder
             ['key' => 'together_since', 'value' => '2024-12-01'],
             // základ počítadiel — reálne fotky sa pripočítavajú automaticky
             ['key' => 'total_photos',   'value' => '0'],
-            ['key' => 'total_km',       'value' => '0'],
             ['key' => 'mascot_variant', 'value' => 'pebbles'],
         ];
 

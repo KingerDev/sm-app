@@ -123,7 +123,6 @@ export default function Stats({ navigate }) {
                         />
                         <StatCard num={(stats?.photos ?? 0).toLocaleString('sk-SK')} label="fotiek" />
                         <StatCard num={stats?.countries ?? 0} label="krajín" sub={`${stats?.cities ?? 0} miest`} />
-                        <StatCard num={(stats?.km ?? 0).toLocaleString('sk-SK')} label="km" sub="precestovaných spolu" />
                         <StatCard
                             num={`${stats?.bucket_done ?? 0}/${stats?.bucket_total ?? 0}`}
                             label="bucket list"
@@ -169,7 +168,6 @@ function StatsMenu({ onClose, navigate }) {
         const text = `S+M · ${(stats?.days_together ?? 0).toLocaleString('sk-SK')} dní spolu · ` +
             `${(stats?.photos ?? 0).toLocaleString('sk-SK')} fotiek · ` +
             `${stats?.countries ?? 0} krajín, ${stats?.cities ?? 0} miest · ` +
-            `${(stats?.km ?? 0).toLocaleString('sk-SK')} km · ` +
             `bucket list ${stats?.bucket_done ?? 0}/${stats?.bucket_total ?? 0} ♡`;
         try {
             if (navigator.share) {

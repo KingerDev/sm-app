@@ -76,8 +76,8 @@ const buildYearlySlides = (stats, wrapped) => {
         bg: 'linear-gradient(165deg, #2d5a3d 0%, #5a7a4a 100%)',
         eyebrow: 'krajiny ✦',
         big: stats?.countries ?? 0,
-        bigLabel: `krajín · ${stats?.cities ?? 0} miest · ${(stats?.km ?? 0).toLocaleString('sk-SK')} km`,
-        body: 'Každý kilometer z nich stál za to.',
+        bigLabel: `krajín · ${stats?.cities ?? 0} miest`,
+        body: 'Každé z tých miest stálo za to.',
         sign: '✈',
     });
 
@@ -135,13 +135,21 @@ export default function Wrapped({ slides, kind = 'yearly', onExit }) {
     const [paused, setPaused] = useState(false);
     const slide = allSlides[idx];
 
+    // Progress prvého slajdu: transition sa pri prvom vykreslení nespustí (element
+    // by naskočil rovno na 100 %) — najskôr vykreslíme 0 % a o frame neskôr pustíme animáciu
+    const [armed, setArmed] = useState(false);
     useEffect(() => {
-        if (paused) return;
+        const id = requestAnimationFrame(() => requestAnimationFrame(() => setArmed(true)));
+        return () => cancelAnimationFrame(id);
+    }, []);
+
+    useEffect(() => {
+        if (paused || !armed) return;
         const t = setTimeout(() => {
             if (idx < allSlides.length - 1) setIdx(idx + 1);
         }, 6000);
         return () => clearTimeout(t);
-    }, [idx, paused, allSlides.length]);
+    }, [idx, paused, armed, allSlides.length]);
 
     const next = () => idx < allSlides.length - 1 ? setIdx(idx + 1) : onExit();
     const prev = () => idx > 0 && setIdx(idx - 1);
@@ -160,6 +168,7 @@ export default function Wrapped({ slides, kind = 'yearly', onExit }) {
             onMouseUp={() => setPaused(false)}
             onTouchStart={() => setPaused(true)}
             onTouchEnd={() => setPaused(false)}
+            onTouchCancel={() => setPaused(false)}
         >
             {/* progress */}
             <div className="row gap-6" style={{ marginBottom: 24 }}>
@@ -170,9 +179,9 @@ export default function Wrapped({ slides, kind = 'yearly', onExit }) {
                         overflow: 'hidden',
                     }}>
                         <div style={{
-                            width: i < idx ? '100%' : i === idx ? (paused ? '50%' : '100%') : '0%',
+                            width: i < idx ? '100%' : i === idx ? (paused ? '50%' : armed ? '100%' : '0%') : '0%',
                             height: '100%', background: 'var(--paper)',
-                            transition: i === idx ? (paused ? 'none' : 'width 6000ms linear') : 'width 200ms',
+                            transition: i === idx ? (paused || !armed ? 'none' : 'width 6000ms linear') : 'width 200ms',
                         }} />
                     </div>
                 ))}

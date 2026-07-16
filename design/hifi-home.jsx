@@ -1,6 +1,6 @@
 // HOME screen (V2-based) — "spolu už" + big day count + shortcuts + recent moment
 
-const Home = ({ navigate, mascotVariant = 'pebbles' }) => {
+const Home = ({ navigate, mascotVariant = 'pebbles', notes = [], onAddNote }) => {
   const m = MOMENTS[0]; // most recent
   const nextCapsule = CAPSULES
     .map(c => ({ ...c, daysLeft: daysUntil(c.unlock) }))
@@ -62,6 +62,9 @@ const Home = ({ navigate, mascotVariant = 'pebbles' }) => {
         </div>
 
         <div className="divider" style={{ margin: '4px 0 20px' }} />
+
+        {/* Momentka — quick capture of an ordinary-day moment */}
+        <QuickNote onAdd={onAddNote} recent={notes.slice(0, 2)} navigate={navigate} />
 
         {/* Na dnes — nearest upcoming milestone */}
         {nextEvent && (
@@ -217,6 +220,73 @@ const Home = ({ navigate, mascotVariant = 'pebbles' }) => {
         )}
       </div>
     </>
+  );
+};
+
+const NOTE_SEEDS = ['road', 'cafe', 'home', 'picnic', 'city', 'forest'];
+const QuickNote = ({ onAdd, recent = [], navigate }) => {
+  const [text, setText] = React.useState('');
+  const [seed, setSeed] = React.useState(null);
+  const submit = () => { const v = text.trim(); if (!v || !onAdd) return; onAdd(v, seed); setText(''); setSeed(null); };
+  const attach = () => setSeed(NOTE_SEEDS[Math.floor(Math.random() * NOTE_SEEDS.length)]);
+  return (
+    <div style={{ marginBottom: 18 }}>
+      <div className="row between" style={{ marginBottom: 10, alignItems: 'baseline' }}>
+        <div className="handwritten" style={{ fontSize: 22 }}>Dnešná chvíľka</div>
+        <button className="btn ghost" onClick={() => navigate('momentka-add')}
+          style={{ padding: '2px 4px', fontSize: 12, color: 'var(--muted)' }}>podrobnejšie →</button>
+      </div>
+      {seed && (
+        <div style={{ position: 'relative', marginBottom: 8, width: 'fit-content' }}>
+          <Photo seed={seed} style={{ width: 74, height: 74, borderRadius: 12 }} />
+          <button onClick={() => setSeed(null)} style={{
+            position: 'absolute', top: -6, right: -6, width: 22, height: 22, borderRadius: '50%',
+            background: 'var(--ink)', color: 'var(--paper)', border: '2px solid var(--paper)',
+            display: 'grid', placeItems: 'center', cursor: 'pointer', padding: 0,
+          }}>{React.cloneElement(Icons.close, { style: { width: 12, height: 12 } })}</button>
+        </div>
+      )}
+      <div className="row gap-8" style={{ alignItems: 'stretch' }}>
+        <button className="icon-btn" onClick={attach} title="pridať fotku"
+          style={{ flexShrink: 0, color: seed ? 'var(--green)' : 'var(--muted)' }}>
+          {React.cloneElement(Icons.img, { style: { width: 19, height: 19 } })}
+        </button>
+        <input value={text} onChange={e => setText(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); submit(); } }}
+          placeholder="čo sa dnes stalo? napr. zmokli sme…"
+          style={{
+            flex: 1, font: 'inherit', fontSize: 14, color: 'var(--ink)',
+            background: 'var(--surface)', border: '0.5px solid var(--line)',
+            borderRadius: 12, padding: '12px 14px', outline: 'none', minWidth: 0,
+          }} />
+        <button className="btn primary" onClick={submit} disabled={!text.trim()}
+          style={{ flexShrink: 0, padding: '0 16px', opacity: text.trim() ? 1 : 0.4, cursor: text.trim() ? 'pointer' : 'default' }}>
+          {React.cloneElement(Icons.send, { style: { width: 18, height: 18 } })}
+        </button>
+      </div>
+      {recent.length > 0 && (
+        <div className="col gap-6" style={{ marginTop: 12 }}>
+          {recent.map(n => (
+            <button key={n.id} onClick={() => navigate('momentka:' + n.id)} className="row gap-10" style={{
+              alignItems: 'flex-start', padding: '10px 13px', textAlign: 'left', width: '100%',
+              background: 'var(--green-soft)', borderRadius: 12, border: 'none', font: 'inherit', color: 'inherit', cursor: 'pointer',
+            }}>
+              {n.seed
+                ? <Photo seed={n.seed} style={{ width: 40, height: 40, borderRadius: 9, flexShrink: 0 }} />
+                : <span style={{ color: 'var(--green)', fontSize: 14, lineHeight: '19px', flexShrink: 0 }}>✎</span>}
+              <div className="col" style={{ gap: 3, minWidth: 0 }}>
+                <div style={{ fontSize: 13, lineHeight: 1.45 }}>{n.text}</div>
+                <div className="eyebrow" style={{ color: 'var(--green)' }}>{n.dateShort} · {n.who}</div>
+              </div>
+            </button>
+          ))}
+          <button className="btn ghost" onClick={() => navigate('gallery')}
+            style={{ alignSelf: 'flex-start', padding: '2px 4px', fontSize: 12, color: 'var(--muted)' }}>
+            všetky chvíľky v galérii →
+          </button>
+        </div>
+      )}
+    </div>
   );
 };
 
