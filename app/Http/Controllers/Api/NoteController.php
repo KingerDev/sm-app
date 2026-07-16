@@ -21,16 +21,18 @@ class NoteController extends Controller
     public function store(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'text' => 'required|string|max:2000',
-            'who'  => 'nullable|in:S,M,spolu',
-            'date' => 'nullable|date',
-            'file' => 'nullable|file|image|max:40960',
+            'text'  => 'required|string|max:2000',
+            'who'   => 'nullable|in:S,M,spolu',
+            'place' => 'nullable|string|max:120',
+            'date'  => 'nullable|date',
+            'file'  => 'nullable|file|image|max:40960',
         ]);
 
         $note = new Note([
-            'text' => $data['text'],
-            'who'  => $data['who'] ?? 'spolu',
-            'date' => $data['date'] ?? now()->toDateString(),
+            'text'  => $data['text'],
+            'who'   => $data['who'] ?? 'spolu',
+            'place' => $data['place'] ?? null,
+            'date'  => $data['date'] ?? now()->toDateString(),
         ]);
 
         if ($file = $request->file('file')) {
@@ -47,18 +49,20 @@ class NoteController extends Controller
     public function update(Request $request, int $id): JsonResponse
     {
         $data = $request->validate([
-            'text' => 'required|string|max:2000',
-            'who'  => 'nullable|in:S,M,spolu',
-            'date' => 'nullable|date',
-            'file' => 'nullable|file|image|max:40960',
+            'text'  => 'required|string|max:2000',
+            'who'   => 'nullable|in:S,M,spolu',
+            'place' => 'nullable|string|max:120',
+            'date'  => 'nullable|date',
+            'file'  => 'nullable|file|image|max:40960',
             'remove_photo' => 'nullable|boolean',
         ]);
 
         $note = Note::findOrFail($id);
         $note->fill([
-            'text' => $data['text'],
-            'who'  => $data['who'] ?? $note->who,
-            'date' => $data['date'] ?? $note->date,
+            'text'  => $data['text'],
+            'who'   => $data['who'] ?? $note->who,
+            'place' => $data['place'] ?? null,
+            'date'  => $data['date'] ?? $note->date,
         ]);
 
         if ($file = $request->file('file')) {

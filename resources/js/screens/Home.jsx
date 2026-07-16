@@ -4,6 +4,7 @@ import { api } from '../api';
 import { useStore } from '../store';
 import { Icons, Photo, ProgressBar, coverSrc, iconBg } from '../components/shell';
 import Mascot from '../components/Mascot';
+import CoverPicker from '../components/CoverPicker';
 import { daysUntil, durationSk, formatDateSk, formatDateShortSk, parseDate, today } from '../lib/dates';
 
 export default function Home({ navigate }) {
@@ -227,24 +228,33 @@ export default function Home({ navigate }) {
     );
 }
 
-/* Rýchla chvíľka — text + voliteľná fotka, uloží sa hneď z Domova */
+/* Rýchla chvíľka — text + voliteľná fotka (s výrezom) a miesto, uloží sa hneď z Domova */
 const QuickNote = ({ recent, navigate }) => {
     const { user, refresh } = useStore();
     const [text, setText] = useState('');
-    const [file, setFile] = useState(null); // { file, url }
+    const [file, setFile] = useState(null); // { file, url } — už orezaná
+    const [crop, setCrop] = useState(null); // File — čaká na výber výrezu
+    const [place, setPlace] = useState('');
+    const [placeOpen, setPlaceOpen] = useState(false);
     const [busy, setBusy] = useState(false);
     const fileRef = useRef(null);
 
     const defaultWho = user?.name === 'S' || user?.name === 'M' ? user.name : 'spolu';
 
-    const pickFile = (f) => {
-        if (!f) return;
+    const applyCrop = (cropped) => {
         if (file) URL.revokeObjectURL(file.url);
-        setFile({ file: f, url: URL.createObjectURL(f) });
+        setFile({ file: cropped, url: URL.createObjectURL(cropped) });
+        setCrop(null);
     };
     const clearFile = () => {
         if (file) URL.revokeObjectURL(file.url);
         setFile(null);
+    };
+    // Úprava výrezu — ťuknutím na náhľad
+    const recrop = async () => {
+        if (!file) return;
+        const blob = await (await fetch(file.url)).blob();
+        setCrop(new File([blob], 'chvilka.jpg', { type: blob.type || 'image/jpeg' }));
     };
 
     const submit = async () => {
@@ -255,11 +265,14 @@ const QuickNote = ({ recent, navigate }) => {
             const fd = new FormData();
             fd.append('text', v);
             fd.append('who', defaultWho);
+            if (place.trim()) fd.append('place', place.trim());
             if (file) fd.append('file', file.file);
             await api.post('/notes', fd);
             await refresh('notes');
             clearFile();
             setText('');
+            setPlace('');
+            setPlaceOpen(false);
         } catch {
             alert('Chvíľka sa neuložila — skús znova.');
         }
@@ -269,7 +282,7 @@ const QuickNote = ({ recent, navigate }) => {
     return (
         <div style={{ marginBottom: 18 }}>
             <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }}
-                onChange={(e) => { pickFile(e.target.files?.[0]); e.target.value = ''; }} />
+                onChange={(e) => { if (e.target.files?.[0]) setCrop(e.target.files[0]); e.target.value = ''; }} />
 
             <div className="row between" style={{ marginBottom: 10, alignItems: 'baseline' }}>
                 <div className="handwritten" style={{ fontSize: 22 }}>Dnešná chvíľka</div>
@@ -278,7 +291,8 @@ const QuickNote = ({ recent, navigate }) => {
             </div>
             {file && (
                 <div style={{ position: 'relative', marginBottom: 8, width: 'fit-content' }}>
-                    <Photo url={file.url} style={{ width: 74, height: 74, borderRadius: 12 }} />
+                    <Photo url={file.url} onClick={recrop} title="upraviť výrez"
+                        style={{ width: 74, height: 74, borderRadius: 12, cursor: 'pointer' }} />
                     <button onClick={clearFile} style={{
                         position: 'absolute', top: -6, right: -6, width: 22, height: 22, borderRadius: '50%',
                         background: 'var(--ink)', color: 'var(--paper)', border: '2px solid var(--paper)',
@@ -286,10 +300,30 @@ const QuickNote = ({ recent, navigate }) => {
                     }}>{cloneElement(Icons.close, { style: { width: 12, height: 12 } })}</button>
                 </div>
             )}
+            {placeOpen && (
+                <div style={{ position: 'relative', marginBottom: 8 }}>
+                    <span style={{
+                        position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)',
+                        color: 'var(--muted-2)', display: 'grid', placeItems: 'center', pointerEvents: 'none',
+                    }}>{cloneElement(Icons.pin, { style: { width: 15, height: 15 } })}</span>
+                    <input value={place} onChange={e => setPlace(e.target.value)} autoFocus
+                        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); submit(); } }}
+                        placeholder="kde to bolo?"
+                        style={{
+                            width: '100%', font: 'inherit', fontSize: 13.5, color: 'var(--ink)',
+                            background: 'var(--surface)', border: '0.5px solid var(--line)',
+                            borderRadius: 12, padding: '10px 12px 10px 34px', outline: 'none',
+                        }} />
+                </div>
+            )}
             <div className="row gap-8" style={{ alignItems: 'stretch' }}>
                 <button className="icon-btn" onClick={() => fileRef.current?.click()} title="pridať fotku"
                     style={{ flexShrink: 0, color: file ? 'var(--green)' : 'var(--muted)' }}>
                     {cloneElement(Icons.img, { style: { width: 19, height: 19 } })}
+                </button>
+                <button className="icon-btn" onClick={() => setPlaceOpen(!placeOpen)} title="pridať miesto"
+                    style={{ flexShrink: 0, color: place.trim() ? 'var(--green)' : 'var(--muted)' }}>
+                    {cloneElement(Icons.pin, { style: { width: 19, height: 19 } })}
                 </button>
                 <input value={text} onChange={e => setText(e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); submit(); } }}
@@ -316,7 +350,9 @@ const QuickNote = ({ recent, navigate }) => {
                                 : <span style={{ color: 'var(--green)', fontSize: 14, lineHeight: '19px', flexShrink: 0 }}>✎</span>}
                             <div className="col" style={{ gap: 3, minWidth: 0 }}>
                                 <div style={{ fontSize: 13, lineHeight: 1.45 }}>{n.text}</div>
-                                <div className="eyebrow" style={{ color: 'var(--green)' }}>{n.date_short} · {n.who}</div>
+                                <div className="eyebrow" style={{ color: 'var(--green)' }}>
+                                    {n.date_short} · {n.who}{n.place ? ` · 📍 ${n.place}` : ''}
+                                </div>
                             </div>
                         </button>
                     ))}
@@ -325,6 +361,20 @@ const QuickNote = ({ recent, navigate }) => {
                         všetky chvíľky v galérii →
                     </button>
                 </div>
+            )}
+
+            {/* Výber výrezu fotky — štvorec ako v galérii */}
+            {crop && (
+                <CoverPicker
+                    file={crop}
+                    aspect="1 / 1"
+                    maxWidth={300}
+                    eyebrow={`dnes · ${defaultWho}${place.trim() ? ` · 📍 ${place.trim()}` : ''} · chvíľka`}
+                    title={text.trim() || 'dnešná chvíľka'}
+                    saveLabel="použiť fotku"
+                    onCancel={() => setCrop(null)}
+                    onSave={applyCrop}
+                />
             )}
         </div>
     );

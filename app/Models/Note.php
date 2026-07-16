@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Storage;
 class Note extends Model
 {
     protected $fillable = [
-        'text', 'who', 'date', 'photo_path', 'photo_thumb_path',
+        'text', 'who', 'place', 'date', 'photo_path', 'photo_thumb_path',
     ];
 
     protected $casts = [

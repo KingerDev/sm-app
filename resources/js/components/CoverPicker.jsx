@@ -1,12 +1,16 @@
-// Výber výrezu titulnej fotky — živý náhľad karty momentu.
+// Výber výrezu fotky — živý náhľad karty (moment / chvíľka).
 // Fotkou sa dá hýbať (drag), približovať (pinch / koliesko / slider); čo vidíš, to sa uloží.
 import { cloneElement, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Icons } from './shell';
 
 const MAX_ZOOM = 5;
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 
-export default function CoverPicker({ file, moment, onCancel, onSave }) {
+export default function CoverPicker({
+    file, eyebrow, title, onCancel, onSave,
+    aspect = '7 / 4', maxWidth = 380, saveLabel = 'použiť ako titulnú',
+}) {
     const [url] = useState(() => URL.createObjectURL(file));
     const [img, setImg] = useState(null); // { w, h } — prirodzené rozmery fotky
     const [frame, setFrame] = useState(null); // { w, h } — rozmery výrezu na obrazovke
@@ -148,7 +152,7 @@ export default function CoverPicker({ file, moment, onCancel, onSave }) {
 
         canvas.toBlob((blob) => {
             if (!blob) { setBusy(false); return; }
-            onSave(new File([blob], 'titulna.jpg', { type: 'image/jpeg' }));
+            onSave(new File([blob], 'vyrez.jpg', { type: 'image/jpeg' }));
         }, 'image/jpeg', 0.92);
     };
 
@@ -163,7 +167,8 @@ export default function CoverPicker({ file, moment, onCancel, onSave }) {
 
     const zoomValue = view ? view.s / minScale : 1;
 
-    return (
+    // Portál na .app-frame — nech prekryje aj tab bar, nech je jedno, odkiaľ sa otvára
+    return createPortal(
         <div style={{
             position: 'absolute', inset: 0, zIndex: 70,
             background: 'rgba(12, 16, 13, 0.97)',
@@ -172,7 +177,7 @@ export default function CoverPicker({ file, moment, onCancel, onSave }) {
         }}>
             {/* Horná lišta */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px' }}>
-                <span className="eyebrow" style={{ color: 'rgba(255,255,255,0.75)' }}>titulná fotka</span>
+                <span className="eyebrow" style={{ color: 'rgba(255,255,255,0.75)' }}>výrez fotky</span>
                 <button className="icon-btn" style={{
                     background: 'rgba(250,250,247,0.12)', border: 'none', color: 'var(--paper)',
                     backdropFilter: 'blur(6px)',
@@ -181,7 +186,7 @@ export default function CoverPicker({ file, moment, onCancel, onSave }) {
 
             {/* Náhľad karty — presne takto bude vyzerať */}
             <div style={{ flex: 1, minHeight: 0, display: 'grid', placeItems: 'center', padding: '0 20px' }}>
-                <div style={{ width: '100%', maxWidth: 380 }}>
+                <div style={{ width: '100%', maxWidth }}>
                     <div className="eyebrow" style={{ color: 'rgba(255,255,255,0.55)', marginBottom: 8, textAlign: 'center' }}>
                         náhľad · takto bude vyzerať
                     </div>
@@ -195,7 +200,7 @@ export default function CoverPicker({ file, moment, onCancel, onSave }) {
                             onPointerUp={onPointerUp}
                             onPointerCancel={onPointerUp}
                             style={{
-                                aspectRatio: '7 / 4', position: 'relative', overflow: 'hidden',
+                                aspectRatio: aspect, position: 'relative', overflow: 'hidden',
                                 touchAction: 'none', cursor: 'grab', background: 'var(--line-soft)',
                             }}>
                             {view && (
@@ -206,10 +211,17 @@ export default function CoverPicker({ file, moment, onCancel, onSave }) {
                                 }} />
                             )}
                         </div>
-                        <div style={{ padding: '12px 14px 14px' }}>
-                            <div className="eyebrow">{moment.date_short} · {moment.place_short}</div>
-                            <div style={{ fontSize: 17, fontWeight: 500, color: 'var(--ink)', marginTop: 2 }}>{moment.title}</div>
-                        </div>
+                        {(eyebrow || title) && (
+                            <div style={{ padding: '12px 14px 14px' }}>
+                                {eyebrow && <div className="eyebrow">{eyebrow}</div>}
+                                {title && (
+                                    <div style={{
+                                        fontSize: 17, fontWeight: 500, color: 'var(--ink)', marginTop: 2,
+                                        display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+                                    }}>{title}</div>
+                                )}
+                            </div>
+                        )}
                     </div>
                     <div className="handwritten" style={{ textAlign: 'center', marginTop: 12, fontSize: 16, color: 'rgba(255,255,255,0.6)' }}>
                         potiahni fotku · priblíž prstami ✎
@@ -236,10 +248,11 @@ export default function CoverPicker({ file, moment, onCancel, onSave }) {
                     </button>
                     <button className="btn invert" onClick={save} disabled={busy || !view}
                         style={{ flex: 1, padding: '13px', fontSize: 14.5, justifyContent: 'center' }}>
-                        {busy ? 'ukladám…' : <>{cloneElement(Icons.check, { style: { width: 16, height: 16 } })} použiť ako titulnú</>}
+                        {busy ? 'ukladám…' : <>{cloneElement(Icons.check, { style: { width: 16, height: 16 } })} {saveLabel}</>}
                     </button>
                 </div>
             </div>
-        </div>
+        </div>,
+        document.querySelector('.app-frame') || document.body
     );
 }

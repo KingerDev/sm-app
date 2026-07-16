@@ -104,7 +104,7 @@ export default function Gallery({ navigate }) {
                                             <div className="col" style={{ gap: 6, minWidth: 0 }}>
                                                 <div style={{ fontSize: 13.5, lineHeight: 1.5, color: 'var(--ink)' }}>{it.note.text}</div>
                                                 <div className="eyebrow" style={{ color: 'var(--green)' }}>
-                                                    {it.note.date_short} · {it.note.who} · chvíľka
+                                                    {it.note.date_short} · {it.note.who}{it.note.place ? ` · 📍 ${it.note.place}` : ''} · chvíľka
                                                 </div>
                                             </div>
                                         </button>

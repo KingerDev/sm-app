@@ -355,7 +355,8 @@ export default function MomentDetail({ slug, onBack, navigate }) {
             {coverEdit && (
                 <CoverPicker
                     file={coverEdit.file}
-                    moment={m}
+                    eyebrow={`${m.date_short} · ${m.place_short}`}
+                    title={m.title}
                     onCancel={() => setCoverEdit(null)}
                     onSave={(edited) => {
                         const { photo } = coverEdit;
