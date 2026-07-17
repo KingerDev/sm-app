@@ -329,8 +329,8 @@ export function MomentForm({ slug, onBack, navigate }) {
     );
 }
 
-/* ---------- Výber miesta ---------- */
-const PlacePicker = ({ current, countries, moments, onClose, onPick }) => {
+/* ---------- Výber miesta (zdieľaný — momenty aj chvíľky) ---------- */
+export const PlacePicker = ({ current, countries, moments, onClose, onPick }) => {
     const [q, setQ] = useState('');
     const [adding, setAdding] = useState(false);
     const [newCity, setNewCity] = useState('');

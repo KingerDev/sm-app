@@ -331,11 +331,20 @@ function AddPlaceSheet({ countries, onClose }) {
 
 /* ---- Detail krajiny (drill-in overlay) ---- */
 function CountryDetail({ country, onClose, navigate }) {
-    const { moments, refresh } = useStore();
+    const { moments, notes, refresh } = useStore();
     const pin = country.lat != null
         ? [{ lat: country.lat, lng: country.lng, label: country.name, active: true }]
         : [];
     const withMoments = country.cities.filter(c => c.momentIds && c.momentIds.length);
+
+    // Chvíľky z tejto krajiny — párujú sa cez label miesta "Mesto · Krajina"
+    const notesOfCity = (cityName) => (notes || []).filter(n =>
+        (n.place || '').toLowerCase() === `${cityName} · ${country.name}`.toLowerCase());
+    const countryNotes = (notes || []).filter(n => {
+        const parts = (n.place || '').split(' · ').map(s => s.trim());
+        return parts.length === 2 && parts[1].toLowerCase() === country.name.toLowerCase();
+    });
+    const noteWord = (n) => n === 1 ? 'chvíľka' : n < 5 ? 'chvíľky' : 'chvíľok';
 
     const deleteCountry = async () => {
         if (!confirm(`Vymazať „${country.name}" z mapy aj so všetkými mestami?`)) return;
@@ -383,16 +392,18 @@ function CountryDetail({ country, onClose, navigate }) {
                 <div className="eyebrow" style={{ marginBottom: 10 }}>mestá a miesta</div>
                 <div className="card" style={{ padding: '4px 14px', marginBottom: 20 }}>
                     {country.cities.map((ci, i) => {
+                        const cityNotes = notesOfCity(ci.name);
                         const linked = ci.momentIds && ci.momentIds.length;
                         return (
                             <button key={ci.name}
-                                onClick={linked ? () => navigate('moment:' + ci.momentIds[0]) : undefined}
+                                onClick={linked ? () => navigate('moment:' + ci.momentIds[0])
+                                    : cityNotes.length ? () => navigate('momentka:' + cityNotes[0].id) : undefined}
                                 className="row gap-12"
                                 style={{
                                     padding: '12px 0', width: '100%', alignItems: 'center',
                                     borderTop: i === 0 ? 'none' : '0.5px solid var(--line)',
                                     background: 'none', border: 'none', font: 'inherit', color: 'inherit',
-                                    cursor: linked ? 'pointer' : 'default', textAlign: 'left',
+                                    cursor: linked || cityNotes.length ? 'pointer' : 'default', textAlign: 'left',
                                 }}>
                                 <span style={{ color: 'var(--green)', flexShrink: 0 }}>
                                     {cloneElement(Icons.pin, { style: { width: 17, height: 17 } })}
@@ -400,7 +411,9 @@ function CountryDetail({ country, onClose, navigate }) {
                                 <div className="col grow" style={{ gap: 2 }}>
                                     <span style={{ fontSize: 13.5, fontWeight: 500 }}>{ci.name}</span>
                                     <span style={{ fontSize: 11, color: 'var(--muted)' }}>
-                                        {ci.photos} fotiek{linked ? ` · ${ci.momentIds.length} ${ci.momentIds.length === 1 ? 'moment' : 'momenty'}` : ''}
+                                        {ci.photos} fotiek
+                                        {linked ? ` · ${ci.momentIds.length} ${ci.momentIds.length === 1 ? 'moment' : 'momenty'}` : ''}
+                                        {cityNotes.length ? ` · ${cityNotes.length} ${noteWord(cityNotes.length)}` : ''}
                                     </span>
                                 </div>
                                 <span onClick={(e) => { e.stopPropagation(); deleteCity(ci); }}
@@ -441,6 +454,32 @@ function CountryDetail({ country, onClose, navigate }) {
                                     </button>
                                 );
                             })}
+                        </div>
+                    </>
+                )}
+
+                {/* Chvíľky odtiaľto */}
+                {countryNotes.length > 0 && (
+                    <>
+                        <div className="eyebrow" style={{ margin: '20px 0 10px' }}>chvíľky odtiaľto</div>
+                        <div className="col gap-8">
+                            {countryNotes.map(n => (
+                                <button key={n.id} onClick={() => navigate('momentka:' + n.id)} className="row gap-10" style={{
+                                    alignItems: 'flex-start', padding: '10px 13px', textAlign: 'left', width: '100%',
+                                    background: 'var(--green-soft)', borderRadius: 12, border: 'none',
+                                    font: 'inherit', color: 'inherit', cursor: 'pointer',
+                                }}>
+                                    {n.photo_thumb_url
+                                        ? <Photo url={n.photo_thumb_url} style={{ width: 40, height: 40, borderRadius: 9, flexShrink: 0 }} />
+                                        : <span style={{ color: 'var(--green)', fontSize: 14, lineHeight: '19px', flexShrink: 0 }}>✎</span>}
+                                    <div className="col" style={{ gap: 3, minWidth: 0 }}>
+                                        <div style={{ fontSize: 13, lineHeight: 1.45 }}>{n.text}</div>
+                                        <div className="eyebrow" style={{ color: 'var(--green)' }}>
+                                            {n.date_short} · {n.who}{n.place_short ? ` · 📍 ${n.place_short}` : ''}
+                                        </div>
+                                    </div>
+                                </button>
+                            ))}
                         </div>
                     </>
                 )}

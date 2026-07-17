@@ -4,7 +4,14 @@ import { api, ApiError } from '../api';
 import { useStore } from '../store';
 import { Icons, Photo } from '../components/shell';
 import CoverPicker from '../components/CoverPicker';
+import { PlacePicker } from './MomentForm';
 import { formatDateShortSk, toInputDate } from '../lib/dates';
+
+// "Viedeň · Rakúsko" → mesto + krajina (pre prepojenie s mapou)
+export const parsePlace = (label) => {
+    const parts = (label || '').split(' · ').map(s => s.trim());
+    return parts.length === 2 ? { city: parts[0], country: parts[1] } : { city: '', country: '' };
+};
 
 const mkInput = {
     width: '100%', font: 'inherit', fontSize: 15, color: 'var(--ink)',
@@ -18,7 +25,7 @@ const mkPhotoBtn = {
 };
 
 export default function Momentka({ id, onBack }) {
-    const { user, notes, refresh } = useStore();
+    const { user, notes, moments, countries, refresh } = useStore();
     const note = id ? notes.find(n => String(n.id) === String(id)) : null;
     const edit = !!note;
 
@@ -27,6 +34,10 @@ export default function Momentka({ id, onBack }) {
     const [text, setText] = useState(edit ? note.text : '');
     const [who, setWho] = useState(edit ? note.who : defaultWho);
     const [place, setPlace] = useState(edit ? (note.place || '') : '');
+    const [placeShort, setPlaceShort] = useState(edit ? (note.place_short || '') : '');
+    const [placeCity, setPlaceCity] = useState(edit ? parsePlace(note.place).city : '');
+    const [placeCountry, setPlaceCountry] = useState(edit ? parsePlace(note.place).country : '');
+    const [placeSheet, setPlaceSheet] = useState(false);
     const [date, setDate] = useState(edit ? toInputDate(note.date) : toInputDate(new Date()));
     const [file, setFile] = useState(null); // { file, url } — nová fotka (už orezaná)
     const [crop, setCrop] = useState(null); // File — fotka čakajúca na výber výrezu
@@ -77,13 +88,19 @@ export default function Momentka({ id, onBack }) {
             fd.append('text', text.trim());
             fd.append('who', who);
             fd.append('place', place.trim());
+            if (placeShort.trim()) fd.append('place_short', placeShort.trim());
+            // Prepojenie na mapu — založí krajinu/mesto ak treba
+            if (placeCity.trim() && placeCountry.trim()) {
+                fd.append('city', placeCity.trim());
+                fd.append('country', placeCountry.trim());
+            }
             if (date) fd.append('date', date);
             if (file) fd.append('file', file.file);
             if (!file && removePhoto) fd.append('remove_photo', '1');
 
             // update cez POST — multipart (PHP nespracuje súbory v PATCH)
             await api.post(edit ? `/notes/${note.id}` : '/notes', fd);
-            await refresh('notes');
+            await refresh('notes', 'countries', 'stats');
             if (file) URL.revokeObjectURL(file.url);
             onBack();
         } catch (e) {
@@ -164,16 +181,30 @@ export default function Momentka({ id, onBack }) {
                     placeholder="napr. zmokli sme cestou z obchodu…"
                     style={{ ...mkInput, resize: 'none', lineHeight: 1.5, marginBottom: 18 }} />
 
-                {/* Miesto (nepovinné) */}
+                {/* Miesto (nepovinné) — výber ako pri momentoch, prepája sa s mapou */}
                 <div className="eyebrow" style={{ marginBottom: 10 }}>kde</div>
-                <div style={{ position: 'relative', marginBottom: 18 }}>
-                    <span style={{
-                        position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)',
-                        color: 'var(--muted-2)', display: 'grid', placeItems: 'center', pointerEvents: 'none',
-                    }}>{cloneElement(Icons.pin, { style: { width: 18, height: 18 } })}</span>
-                    <input value={place} onChange={e => setPlace(e.target.value)}
-                        placeholder="kde to bolo? (nepovinné)"
-                        style={{ ...mkInput, paddingLeft: 42 }} />
+                <div className="row gap-8" style={{ marginBottom: 18 }}>
+                    <button onClick={() => setPlaceSheet(true)} style={{
+                        ...mkInput, paddingLeft: 42, position: 'relative', flex: 1,
+                        display: 'flex', alignItems: 'center', textAlign: 'left', cursor: 'pointer',
+                        color: place ? 'var(--ink)' : 'var(--muted-2)',
+                    }}>
+                        <span style={{
+                            position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)',
+                            color: 'var(--muted-2)', display: 'grid', placeItems: 'center', pointerEvents: 'none',
+                        }}>{cloneElement(Icons.pin, { style: { width: 18, height: 18 } })}</span>
+                        <span className="grow">{place || 'vyber miesto (nepovinné)'}</span>
+                        <span style={{ color: 'var(--muted-2)' }}>
+                            {cloneElement(Icons.arrow, { style: { width: 16, height: 16 } })}
+                        </span>
+                    </button>
+                    {place && (
+                        <button className="icon-btn" title="zrušiť miesto" onClick={() => {
+                            setPlace(''); setPlaceShort(''); setPlaceCity(''); setPlaceCountry('');
+                        }} style={{ flexShrink: 0, alignSelf: 'center', color: 'var(--muted-2)' }}>
+                            {cloneElement(Icons.close, { style: { width: 16, height: 16 } })}
+                        </button>
+                    )}
                 </div>
 
                 {/* Dátum */}
@@ -238,11 +269,27 @@ export default function Momentka({ id, onBack }) {
                     file={crop}
                     aspect="1 / 1"
                     maxWidth={300}
-                    eyebrow={`${date ? formatDateShortSk(date) : ''} · ${who}${place.trim() ? ` · 📍 ${place.trim()}` : ''} · chvíľka`}
+                    eyebrow={`${date ? formatDateShortSk(date) : ''} · ${who}${placeShort.trim() ? ` · 📍 ${placeShort.trim()}` : ''} · chvíľka`}
                     title={text.trim() || (edit ? 'chvíľka' : 'nová chvíľka')}
                     saveLabel="použiť fotku"
                     onCancel={() => setCrop(null)}
                     onSave={applyCrop}
+                />
+            )}
+
+            {placeSheet && (
+                <PlacePicker
+                    current={place}
+                    countries={countries}
+                    moments={moments}
+                    onClose={() => setPlaceSheet(false)}
+                    onPick={(p) => {
+                        setPlace(p.label);
+                        setPlaceShort(p.short);
+                        setPlaceCity(p.city || '');
+                        setPlaceCountry(p.country || '');
+                        setPlaceSheet(false);
+                    }}
                 />
             )}
         </div>

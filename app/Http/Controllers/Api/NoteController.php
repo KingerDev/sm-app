@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Note;
 use App\Support\Images;
+use App\Support\Places;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -21,18 +22,25 @@ class NoteController extends Controller
     public function store(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'text'  => 'required|string|max:2000',
-            'who'   => 'nullable|in:S,M,spolu',
-            'place' => 'nullable|string|max:120',
-            'date'  => 'nullable|date',
-            'file'  => 'nullable|file|image|max:40960',
+            'text'        => 'required|string|max:2000',
+            'who'         => 'nullable|in:S,M,spolu',
+            'place'       => 'nullable|string|max:120',
+            'place_short' => 'nullable|string|max:60',
+            'city'        => 'nullable|string|max:80',
+            'country'     => 'nullable|string|max:80',
+            'date'        => 'nullable|date',
+            'file'        => 'nullable|file|image|max:40960',
         ]);
 
+        // Prepojenie na mapu — založí krajinu/mesto ako pri momentoch
+        $this->ensurePlace($data);
+
         $note = new Note([
-            'text'  => $data['text'],
-            'who'   => $data['who'] ?? 'spolu',
-            'place' => $data['place'] ?? null,
-            'date'  => $data['date'] ?? now()->toDateString(),
+            'text'        => $data['text'],
+            'who'         => $data['who'] ?? 'spolu',
+            'place'       => $data['place'] ?? null,
+            'place_short' => $data['place_short'] ?? null,
+            'date'        => $data['date'] ?? now()->toDateString(),
         ]);
 
         if ($file = $request->file('file')) {
@@ -49,20 +57,26 @@ class NoteController extends Controller
     public function update(Request $request, int $id): JsonResponse
     {
         $data = $request->validate([
-            'text'  => 'required|string|max:2000',
-            'who'   => 'nullable|in:S,M,spolu',
-            'place' => 'nullable|string|max:120',
-            'date'  => 'nullable|date',
-            'file'  => 'nullable|file|image|max:40960',
+            'text'        => 'required|string|max:2000',
+            'who'         => 'nullable|in:S,M,spolu',
+            'place'       => 'nullable|string|max:120',
+            'place_short' => 'nullable|string|max:60',
+            'city'        => 'nullable|string|max:80',
+            'country'     => 'nullable|string|max:80',
+            'date'        => 'nullable|date',
+            'file'        => 'nullable|file|image|max:40960',
             'remove_photo' => 'nullable|boolean',
         ]);
 
+        $this->ensurePlace($data);
+
         $note = Note::findOrFail($id);
         $note->fill([
-            'text'  => $data['text'],
-            'who'   => $data['who'] ?? $note->who,
-            'place' => $data['place'] ?? null,
-            'date'  => $data['date'] ?? $note->date,
+            'text'        => $data['text'],
+            'who'         => $data['who'] ?? $note->who,
+            'place'       => $data['place'] ?? null,
+            'place_short' => $data['place_short'] ?? null,
+            'date'        => $data['date'] ?? $note->date,
         ]);
 
         if ($file = $request->file('file')) {
@@ -86,5 +100,13 @@ class NoteController extends Controller
         Note::findOrFail($id)->delete(); // súbory zmaže model event
 
         return response()->json(null, 204);
+    }
+
+    /** Založí krajinu/mesto na mape, ak chvíľka prišla s novým miestom. */
+    private function ensurePlace(array $data): void
+    {
+        if (filled($data['city'] ?? null) && filled($data['country'] ?? null)) {
+            Places::ensureCity(Places::ensureCountry($data['country']), $data['city']);
+        }
     }
 }

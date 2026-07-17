@@ -5,6 +5,7 @@ import { useStore } from '../store';
 import { Icons, Photo, ProgressBar, coverSrc, iconBg } from '../components/shell';
 import Mascot from '../components/Mascot';
 import CoverPicker from '../components/CoverPicker';
+import { PlacePicker } from './MomentForm';
 import { daysUntil, durationSk, formatDateSk, formatDateShortSk, parseDate, today } from '../lib/dates';
 
 export default function Home({ navigate }) {
@@ -230,12 +231,12 @@ export default function Home({ navigate }) {
 
 /* Rýchla chvíľka — text + voliteľná fotka (s výrezom) a miesto, uloží sa hneď z Domova */
 const QuickNote = ({ recent, navigate }) => {
-    const { user, refresh } = useStore();
+    const { user, moments, countries, refresh } = useStore();
     const [text, setText] = useState('');
     const [file, setFile] = useState(null); // { file, url } — už orezaná
     const [crop, setCrop] = useState(null); // File — čaká na výber výrezu
-    const [place, setPlace] = useState('');
-    const [placeOpen, setPlaceOpen] = useState(false);
+    const [place, setPlace] = useState(null); // { label, short, city, country } z PlacePickera
+    const [placeSheet, setPlaceSheet] = useState(false);
     const [busy, setBusy] = useState(false);
     const fileRef = useRef(null);
 
@@ -265,14 +266,21 @@ const QuickNote = ({ recent, navigate }) => {
             const fd = new FormData();
             fd.append('text', v);
             fd.append('who', defaultWho);
-            if (place.trim()) fd.append('place', place.trim());
+            if (place) {
+                fd.append('place', place.label);
+                fd.append('place_short', place.short);
+                // Prepojenie na mapu — založí krajinu/mesto ak treba
+                if (place.city && place.country) {
+                    fd.append('city', place.city);
+                    fd.append('country', place.country);
+                }
+            }
             if (file) fd.append('file', file.file);
             await api.post('/notes', fd);
-            await refresh('notes');
+            await refresh('notes', 'countries', 'stats');
             clearFile();
             setText('');
-            setPlace('');
-            setPlaceOpen(false);
+            setPlace(null);
         } catch {
             alert('Chvíľka sa neuložila — skús znova.');
         }
@@ -300,29 +308,26 @@ const QuickNote = ({ recent, navigate }) => {
                     }}>{cloneElement(Icons.close, { style: { width: 12, height: 12 } })}</button>
                 </div>
             )}
-            {placeOpen && (
-                <div style={{ position: 'relative', marginBottom: 8 }}>
-                    <span style={{
-                        position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)',
-                        color: 'var(--muted-2)', display: 'grid', placeItems: 'center', pointerEvents: 'none',
-                    }}>{cloneElement(Icons.pin, { style: { width: 15, height: 15 } })}</span>
-                    <input value={place} onChange={e => setPlace(e.target.value)} autoFocus
-                        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); submit(); } }}
-                        placeholder="kde to bolo?"
-                        style={{
-                            width: '100%', font: 'inherit', fontSize: 13.5, color: 'var(--ink)',
-                            background: 'var(--surface)', border: '0.5px solid var(--line)',
-                            borderRadius: 12, padding: '10px 12px 10px 34px', outline: 'none',
-                        }} />
-                </div>
+            {place && (
+                <button onClick={() => setPlaceSheet(true)} className="chip green" style={{
+                    marginBottom: 8, cursor: 'pointer', border: 'none', font: 'inherit',
+                    display: 'inline-flex', alignItems: 'center', gap: 5,
+                }}>
+                    {cloneElement(Icons.pin, { style: { width: 12, height: 12 } })}
+                    {place.label}
+                    <span role="button" onClick={(e) => { e.stopPropagation(); setPlace(null); }}
+                        style={{ display: 'grid', placeItems: 'center', marginLeft: 2 }}>
+                        {cloneElement(Icons.close, { style: { width: 11, height: 11 } })}
+                    </span>
+                </button>
             )}
             <div className="row gap-8" style={{ alignItems: 'stretch' }}>
                 <button className="icon-btn" onClick={() => fileRef.current?.click()} title="pridať fotku"
                     style={{ flexShrink: 0, color: file ? 'var(--green)' : 'var(--muted)' }}>
                     {cloneElement(Icons.img, { style: { width: 19, height: 19 } })}
                 </button>
-                <button className="icon-btn" onClick={() => setPlaceOpen(!placeOpen)} title="pridať miesto"
-                    style={{ flexShrink: 0, color: place.trim() ? 'var(--green)' : 'var(--muted)' }}>
+                <button className="icon-btn" onClick={() => setPlaceSheet(true)} title="pridať miesto"
+                    style={{ flexShrink: 0, color: place ? 'var(--green)' : 'var(--muted)' }}>
                     {cloneElement(Icons.pin, { style: { width: 19, height: 19 } })}
                 </button>
                 <input value={text} onChange={e => setText(e.target.value)}
@@ -351,7 +356,7 @@ const QuickNote = ({ recent, navigate }) => {
                             <div className="col" style={{ gap: 3, minWidth: 0 }}>
                                 <div style={{ fontSize: 13, lineHeight: 1.45 }}>{n.text}</div>
                                 <div className="eyebrow" style={{ color: 'var(--green)' }}>
-                                    {n.date_short} · {n.who}{n.place ? ` · 📍 ${n.place}` : ''}
+                                    {n.date_short} · {n.who}{n.place ? ` · 📍 ${n.place_short || n.place}` : ''}
                                 </div>
                             </div>
                         </button>
@@ -369,11 +374,21 @@ const QuickNote = ({ recent, navigate }) => {
                     file={crop}
                     aspect="1 / 1"
                     maxWidth={300}
-                    eyebrow={`dnes · ${defaultWho}${place.trim() ? ` · 📍 ${place.trim()}` : ''} · chvíľka`}
+                    eyebrow={`dnes · ${defaultWho}${place ? ` · 📍 ${place.short}` : ''} · chvíľka`}
                     title={text.trim() || 'dnešná chvíľka'}
                     saveLabel="použiť fotku"
                     onCancel={() => setCrop(null)}
                     onSave={applyCrop}
+                />
+            )}
+
+            {placeSheet && (
+                <PlacePicker
+                    current={place?.label}
+                    countries={countries}
+                    moments={moments}
+                    onClose={() => setPlaceSheet(false)}
+                    onPick={(p) => { setPlace(p); setPlaceSheet(false); }}
                 />
             )}
         </div>

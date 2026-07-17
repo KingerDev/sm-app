@@ -5,6 +5,7 @@ import { AppHeader, Icons, Photo, coverSrc } from '../components/shell';
 import { MONTHS_SHORT_SK, daysBetween, formatDateSk, parseDate, today } from '../lib/dates';
 
 const momentWord = (n) => n === 1 ? 'moment' : n < 5 ? 'momenty' : 'momentov';
+const noteWord = (n) => n === 1 ? 'chvíľka' : n < 5 ? 'chvíľky' : 'chvíľok';
 
 export default function Gallery({ navigate }) {
     const { moments, notes, events, settings } = useStore();
@@ -29,15 +30,19 @@ export default function Gallery({ navigate }) {
         ...pastMilestones,
     ].sort((a, b) => b.date - a.date);
 
-    // Po mieste
+    // Po mieste — momenty aj chvíľky s miestom
     const placeMap = {};
     moments.forEach(m => {
         const k = m.place_short;
-        (placeMap[k] = placeMap[k] || { place: m.place, moms: [] }).moms.push(m);
+        (placeMap[k] = placeMap[k] || { place: m.place, moms: [], notes: [] }).moms.push(m);
+    });
+    notes.filter(n => n.place).forEach(n => {
+        const k = n.place_short || n.place;
+        (placeMap[k] = placeMap[k] || { place: n.place, moms: [], notes: [] }).notes.push(n);
     });
     const places = Object.entries(placeMap)
-        .map(([k, v]) => ({ key: k, place: v.place, moms: v.moms }))
-        .sort((a, b) => b.moms.length - a.moms.length);
+        .map(([k, v]) => ({ key: k, place: v.place, moms: v.moms, notes: v.notes }))
+        .sort((a, b) => (b.moms.length + b.notes.length) - (a.moms.length + a.notes.length));
 
     const tabs = [
         { id: 'timeline', label: 'Časová os' },
@@ -104,7 +109,7 @@ export default function Gallery({ navigate }) {
                                             <div className="col" style={{ gap: 6, minWidth: 0 }}>
                                                 <div style={{ fontSize: 13.5, lineHeight: 1.5, color: 'var(--ink)' }}>{it.note.text}</div>
                                                 <div className="eyebrow" style={{ color: 'var(--green)' }}>
-                                                    {it.note.date_short} · {it.note.who}{it.note.place ? ` · 📍 ${it.note.place}` : ''} · chvíľka
+                                                    {it.note.date_short} · {it.note.who}{it.note.place ? ` · 📍 ${it.note.place_short || it.note.place}` : ''} · chvíľka
                                                 </div>
                                             </div>
                                         </button>
@@ -187,7 +192,12 @@ export default function Gallery({ navigate }) {
                                     </span>
                                     <div style={{ fontSize: 14.5, fontWeight: 500 }}>{p.place}</div>
                                     <div className="grow" />
-                                    <span className="eyebrow">{p.moms.length} {momentWord(p.moms.length)}</span>
+                                    <span className="eyebrow">
+                                        {[
+                                            p.moms.length > 0 && `${p.moms.length} ${momentWord(p.moms.length)}`,
+                                            p.notes.length > 0 && `${p.notes.length} ${noteWord(p.notes.length)}`,
+                                        ].filter(Boolean).join(' · ')}
+                                    </span>
                                 </div>
                                 <div style={{ margin: '0 -20px', overflowX: 'auto', paddingLeft: 20 }}>
                                     <div className="row gap-8" style={{ width: 'max-content', paddingRight: 20, alignItems: 'stretch' }}>
@@ -208,6 +218,30 @@ export default function Gallery({ navigate }) {
                                                     }}>{m.title}</div>
                                                     <div className="eyebrow" style={{ textTransform: 'none', letterSpacing: 0 }}>
                                                         {m.date_short} · {m.photos?.length || m.photos_count} fotiek
+                                                    </div>
+                                                </div>
+                                            </button>
+                                        ))}
+                                        {/* Chvíľky z tohto miesta */}
+                                        {p.notes.map(n => (
+                                            <button key={'n' + n.id} onClick={() => navigate('momentka:' + n.id)}
+                                                style={{
+                                                    width: 150, flexShrink: 0, cursor: 'pointer', overflow: 'hidden',
+                                                    borderRadius: 'var(--r-md)', background: 'var(--green-soft)',
+                                                    border: 'none', font: 'inherit', color: 'inherit', textAlign: 'left',
+                                                    display: 'flex', flexDirection: 'column', padding: 0,
+                                                }}>
+                                                {n.photo_thumb_url && (
+                                                    <Photo url={n.photo_thumb_url} style={{ width: 150, height: 100, borderRadius: 0, flexShrink: 0 }} />
+                                                )}
+                                                <div className="col" style={{ gap: 4, padding: '8px 10px 10px', flex: 1, justifyContent: 'space-between' }}>
+                                                    <div style={{
+                                                        fontSize: 12.5, lineHeight: 1.35,
+                                                        display: '-webkit-box', WebkitLineClamp: n.photo_thumb_url ? 2 : 4,
+                                                        WebkitBoxOrient: 'vertical', overflow: 'hidden',
+                                                    }}>{n.text}</div>
+                                                    <div className="eyebrow" style={{ textTransform: 'none', letterSpacing: 0, color: 'var(--green)' }}>
+                                                        {n.date_short} · ✎ chvíľka
                                                     </div>
                                                 </div>
                                             </button>
