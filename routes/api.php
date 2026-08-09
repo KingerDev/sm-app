@@ -16,9 +16,12 @@ use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
     Route::post('/auth/login', [AuthController::class, 'login']);
+    // Token login pre React Native appku (Sanctum personal access token)
+    Route::post('/auth/token', [AuthController::class, 'token']);
 
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('/auth/logout', [AuthController::class, 'logout']);
+        Route::post('/auth/token-logout', [AuthController::class, 'tokenLogout']);
         Route::get('/auth/user', [AuthController::class, 'user']);
 
         Route::get('/stats', [StatsController::class, 'index']);
@@ -39,6 +42,7 @@ Route::prefix('v1')->group(function () {
         Route::delete('/notes/{id}', [NoteController::class, 'destroy']);
 
         Route::post('/photos', [PhotoController::class, 'store']);
+        Route::post('/photos/video', [PhotoController::class, 'storeVideo']);
         Route::patch('/photos/{id}/pin', [PhotoController::class, 'togglePin']);
         // POST kvôli multipart uploadu výrezu (PHP nespracuje súbory v PATCH)
         Route::match(['patch', 'post'], '/photos/{id}/cover', [PhotoController::class, 'setCover']);

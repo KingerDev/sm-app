@@ -30,14 +30,14 @@ class Note extends Model
 
     public function getPhotoUrlAttribute(): ?string
     {
-        return $this->photo_path ? Storage::disk('public')->url($this->photo_path) : null;
+        return $this->photo_path ? Storage::disk(config('filesystems.media'))->url($this->photo_path) : null;
     }
 
     public function getPhotoThumbUrlAttribute(): ?string
     {
         $path = $this->photo_thumb_path ?: $this->photo_path;
 
-        return $path ? Storage::disk('public')->url($path) : null;
+        return $path ? Storage::disk(config('filesystems.media'))->url($path) : null;
     }
 
     protected static function booted(): void

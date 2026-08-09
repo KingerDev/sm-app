@@ -17,6 +17,23 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Disk pre médiá (fotky, videá)
+    |--------------------------------------------------------------------------
+    |
+    | Kam sa ukladá používateľský obsah. Štandardne lokálny disk `public`.
+    | Pre externé úložisko (Cloudflare R2, Backblaze B2, S3) nastav MEDIA_DISK=s3
+    | a doplň AWS_* premenné — R2 je S3-kompatibilné, takže stačí `s3` driver
+    | s vlastným AWS_ENDPOINT a AWS_USE_PATH_STYLE_ENDPOINT=true.
+    |
+    | Médiá sú zámerne oddelené od `default`, aby sa dali presunúť na iné
+    | úložisko nezávisle od zvyšku aplikácie.
+    |
+    */
+
+    'media' => env('MEDIA_DISK', 'public'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Filesystem Disks
     |--------------------------------------------------------------------------
     |

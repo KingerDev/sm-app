@@ -132,7 +132,7 @@ export default function Stats({ navigate }) {
                 </div>
 
                 <div className="handwritten" style={{ marginTop: 22, textAlign: 'center', fontSize: 16 }}>
-                    ✦ mesačné posielame 1. dňa · ročné v januári
+                    ✦ počíta sa samo z vašich momentov · vždy aktuálne
                 </div>
             </div>
 

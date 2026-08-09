@@ -19,6 +19,9 @@
     </source>
     <php>
         <env name="APP_ENV" value="testing"/>
+        <!-- Médiá v testoch nikdy nesmú ísť na skutočné úložisko (R2). Testy
+             falšujú disk `public`, tak ho tu pripneme bez ohľadu na .env. -->
+        <env name="MEDIA_DISK" value="public"/>
         <env name="APP_MAINTENANCE_DRIVER" value="file"/>
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="BROADCAST_CONNECTION" value="null"/>

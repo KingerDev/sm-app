@@ -31,7 +31,7 @@ class Capsule extends Model
     public function getAudioUrlAttribute(): ?string
     {
         return $this->audio_path
-            ? \Illuminate\Support\Facades\Storage::disk('public')->url($this->audio_path)
+            ? \Illuminate\Support\Facades\Storage::disk(config('filesystems.media'))->url($this->audio_path)
             : null;
     }
 
@@ -41,7 +41,7 @@ class Capsule extends Model
         static::deleting(function (Capsule $capsule) {
             $capsule->photos->each->delete();
             if ($capsule->audio_path) {
-                \Illuminate\Support\Facades\Storage::disk('public')->delete($capsule->audio_path);
+                \Illuminate\Support\Facades\Storage::disk(config('filesystems.media'))->delete($capsule->audio_path);
             }
         });
     }

@@ -34,6 +34,7 @@ class PhotoController extends Controller
 
             return $parent->photos()->create([
                 ...$stored,
+                'kind'       => 'image',
                 'taken_at'   => $data['taken_at'] ?? null,
                 'sort_order' => $maxSort + $i + 1,
             ]);
@@ -42,6 +43,45 @@ class PhotoController extends Controller
         $this->syncCounts($parent);
 
         return response()->json($photos->values(), 201);
+    }
+
+    /**
+     * Nahranie videa. Súbor prichádza už zmenšený zo zariadenia (720p, obmedzená
+     * dĺžka) spolu s poster snímkou — server ho ďalej neprekódováva, lebo by to
+     * vyžadovalo ffmpeg a zbytočne zaťažovalo malý stroj.
+     */
+    public function storeVideo(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'type'     => 'required|in:moment,capsule',
+            'id'       => 'required|integer',
+            'video'    => 'required|file|mimetypes:video/mp4,video/quicktime,video/x-m4v|max:204800',
+            'poster'   => 'nullable|file|image|max:20480',
+            'duration' => 'nullable|integer|min:0',
+            'taken_at' => 'nullable|date',
+        ]);
+
+        $parent = $data['type'] === 'moment'
+            ? Moment::findOrFail($data['id'])
+            : Capsule::findOrFail($data['id']);
+
+        $stored = Images::storeVideo(
+            $request->file('video'),
+            $request->file('poster'),
+            $data['type'] === 'moment' ? 'photos/moments' : 'photos/capsules',
+        );
+
+        $photo = $parent->photos()->create([
+            ...$stored,
+            'kind'       => 'video',
+            'duration'   => $data['duration'] ?? null,
+            'taken_at'   => $data['taken_at'] ?? null,
+            'sort_order' => ($parent->photos()->max('sort_order') ?? 0) + 1,
+        ]);
+
+        $this->syncCounts($parent);
+
+        return response()->json($photo, 201);
     }
 
     public function togglePin(int $id): JsonResponse
