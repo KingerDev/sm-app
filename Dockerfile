@@ -7,7 +7,7 @@ COPY . .
 RUN npm run build
 
 # ---- 2. aplikácia ----
-FROM serversideup/php:8.3-fpm-nginx
+FROM serversideup/php:8.4-fpm-nginx
 
 ENV AUTORUN_ENABLED=false
 ENV SSL_MODE=off
