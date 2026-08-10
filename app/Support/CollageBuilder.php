@@ -28,7 +28,7 @@ class CollageBuilder
         'polaroid' => 4,
         'grid' => 5,
         'tape' => 3,
-        'heart' => 26,
+        'heart' => 27,
         'player' => 1,
         'calendar' => 20,
     ];
@@ -56,8 +56,16 @@ class CollageBuilder
         $template = isset(self::TEMPLATES[$template]) ? $template : 'polaroid';
         $photoPaths = array_slice($photoPaths, 0, self::TEMPLATES[$template]);
 
+        // Do kľúča patrí aj geometria šablóny — inak by sa po zmene rozloženia
+        // vracala stará koláž z vyrovnávacej pamäte a vyzeralo by to, že oprava
+        // nezabrala.
         $key = 'collages/'.substr(
-            sha1($template.'|'.implode('|', $photoPaths).'|'.$title.'|'.$subtitle),
+            sha1(
+                $template
+                .'|'.md5(json_encode(self::slots($template)))
+                .'|'.implode('|', array_map(fn ($p) => (string) $p, $photoPaths))
+                .'|'.$title.'|'.$subtitle
+            ),
             0,
             24
         ).'.jpg';
@@ -157,28 +165,43 @@ class CollageBuilder
 
     private static function heartSlots(): array
     {
-        $cx = self::W / 2;
-        $cy = 1000;
-        $scale = 32;
-        $size = 155;
-        $slots = [];
-        $i = 0;
+        // Bunky mriežky, ktoré padnú dovnútra tvaru srdca: (x²+y²−1)³ − x²y³ ≤ 0.
+        // Predtým som skladal prstence po krivke a sťahoval ich k počiatku — ten
+        // ale nie je stredom srdca, takže sa vnútorné fotky zosypali na kopu.
+        $cols = 7;
+        $rows = 7;
+        $cells = [];
 
-        foreach ([[15, 1.0], [8, 0.58], [3, 0.22]] as [$count, $shrink]) {
-            for ($k = 0; $k < $count; $k++) {
-                $t = (($k + ($shrink < 1 ? 0.5 : 0)) / $count) * 2 * M_PI;
-                $hx = 16 * pow(sin($t), 3) * $shrink;
-                $hy = (13 * cos($t) - 5 * cos(2 * $t) - 2 * cos(3 * $t) - cos(4 * $t)) * $shrink;
+        for ($r = 0; $r < $rows; $r++) {
+            for ($c = 0; $c < $cols; $c++) {
+                $x = -1.30 + ($c + 0.5) * (2.6 / $cols);
+                $y = 1.30 - ($r + 0.5) * (2.65 / $rows);
 
-                $slots[] = [
-                    (int) ($cx + $hx * $scale - $size / 2),
-                    (int) ($cy - $hy * $scale - $size / 2),
-                    $size,
-                    $size,
-                    self::TILTS[$i % 6] * 2.2,
-                ];
-                $i++;
+                if (pow($x * $x + $y * $y - 1, 3) - $x * $x * pow($y, 3) <= 0) {
+                    $cells[] = [$c, $r];
+                }
             }
+        }
+
+        // Prázdne spodné riadky nechceme započítať do výšky
+        $usedRows = max(array_column($cells, 1)) + 1;
+
+        $areaX = 70;
+        $areaY = 560;
+        $areaW = self::W - 2 * $areaX;
+        $size = (int) min($areaW / $cols, 1040 / $usedRows) - 6;
+        $stepX = $areaW / $cols;
+        $stepY = ($size + 6);
+
+        $slots = [];
+        foreach ($cells as $i => [$c, $r]) {
+            $slots[] = [
+                (int) ($areaX + $c * $stepX + ($stepX - $size) / 2),
+                (int) ($areaY + $r * $stepY),
+                $size,
+                $size,
+                self::TILTS[$i % 6] * 0.8,
+            ];
         }
 
         return $slots;
