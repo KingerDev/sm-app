@@ -96,27 +96,125 @@ class CollageBuilder
         return $key;
     }
 
+    /**
+     * Políčka šablóny v absolútnych pixeloch: [x, y, šírka, výška, náklon].
+     *
+     * Jediný zdroj pravdy — z tohto kreslí aj vykresľovanie, aj z toho appka
+     * skladá náhľad. Keby to bolo na dvoch miestach, náhľad by časom klamal.
+     *
+     * @return array<int, array{0:int,1:int,2:int,3:int,4:float}>
+     */
+    public static function slots(string $template): array
+    {
+        return match ($template) {
+            'grid' => self::gridSlots(),
+            'tape' => [
+                [130, 340, 560, 660, -2.5],
+                [400, 1090, 560, 620, 2.0],
+                [80, 1160, 280, 340, -1.5],
+            ],
+            'heart' => self::heartSlots(),
+            'player' => [[130, 340, 820, 820, 0.0]],
+            'calendar' => self::calendarSlots(),
+            default => [
+                [90, 300, 430, 560, -2.5],
+                [560, 340, 430, 560, 2.0],
+                [90, 960, 430, 560, -1.5],
+                [560, 1000, 430, 560, 2.8],
+            ],
+        };
+    }
+
+    /** Políčka ako pomer 0–1 — pre náhľad v appke, nezávisle od rozlíšenia. */
+    public static function slotsNormalized(string $template): array
+    {
+        return array_map(fn (array $s) => [
+            'x' => round($s[0] / self::W, 4),
+            'y' => round($s[1] / self::H, 4),
+            'w' => round($s[2] / self::W, 4),
+            'h' => round($s[3] / self::H, 4),
+            'tilt' => $s[4],
+        ], self::slots($template));
+    }
+
+    private static function gridSlots(): array
+    {
+        $pad = 40;
+        $gap = 12;
+        $cell = (int) ((self::W - 2 * $pad - $gap) / 2);
+        $top = 300;
+        $slots = [];
+
+        for ($r = 0; $r < 3; $r++) {
+            for ($col = 0; $col < 2; $col++) {
+                // Index 3 patrí textu, fotka tam nejde
+                if ($r * 2 + $col === 3) {
+                    continue;
+                }
+                $slots[] = [$pad + $col * ($cell + $gap), $top + $r * ($cell + $gap), $cell, $cell, 0.0];
+            }
+        }
+
+        return $slots;
+    }
+
+    private static function heartSlots(): array
+    {
+        $cx = self::W / 2;
+        $cy = 1000;
+        $scale = 32;
+        $size = 155;
+        $slots = [];
+        $i = 0;
+
+        foreach ([[15, 1.0], [8, 0.58], [3, 0.22]] as [$count, $shrink]) {
+            for ($k = 0; $k < $count; $k++) {
+                $t = (($k + ($shrink < 1 ? 0.5 : 0)) / $count) * 2 * M_PI;
+                $hx = 16 * pow(sin($t), 3) * $shrink;
+                $hy = (13 * cos($t) - 5 * cos(2 * $t) - 2 * cos(3 * $t) - cos(4 * $t)) * $shrink;
+
+                $slots[] = [
+                    (int) ($cx + $hx * $scale - $size / 2),
+                    (int) ($cy - $hy * $scale - $size / 2),
+                    $size,
+                    $size,
+                    self::TILTS[$i % 6] * 2.2,
+                ];
+                $i++;
+            }
+        }
+
+        return $slots;
+    }
+
+    private static function calendarSlots(): array
+    {
+        $pad = 50;
+        $gap = 8;
+        $cols = 5;
+        $cell = (int) ((self::W - 2 * $pad - ($cols - 1) * $gap) / $cols);
+        $top = 420;
+        $slots = [];
+
+        for ($r = 0; $r < 4; $r++) {
+            for ($col = 0; $col < $cols; $col++) {
+                $slots[] = [$pad + $col * ($cell + $gap), $top + $r * ($cell + $gap), $cell, $cell, 0.0];
+            }
+        }
+
+        return $slots;
+    }
+
     // ---------------------------------------------------------------- šablóny
 
     /** Rozsypané polaroidy na papieri. */
     private static function renderPolaroid(ImageManager $m, ImageInterface $c, array $photos, string $title, ?string $sub): void
     {
-        $slots = match (true) {
-            count($photos) >= 4 => [
-                [90, 300, 430, 560], [560, 340, 430, 560],
-                [90, 960, 430, 560], [560, 1000, 430, 560],
-            ],
-            count($photos) === 3 => [[130, 300, 820, 620], [110, 1000, 400, 500], [560, 1040, 400, 500]],
-            count($photos) === 2 => [[120, 300, 840, 620], [120, 1000, 840, 620]],
-            default => [[110, 380, 860, 1080]],
-        };
-
-        foreach ($photos as $i => $bytes) {
-            if (! isset($slots[$i])) {
+        foreach (self::slots('polaroid') as $i => [$x, $y, $w, $h, $tilt]) {
+            if (! isset($photos[$i])) {
                 break;
             }
-            [$x, $y, $w, $h] = $slots[$i];
-            self::place($m, $c, $bytes, $x, $y, $w, $h, self::TILTS[$i % 6], 26);
+            self::place($m, $c, $photos[$i], $x, $y, $w, $h, $tilt, 26);
         }
 
         self::title($c, $title, 150);
@@ -126,37 +224,27 @@ class CollageBuilder
     /** Čistá mriežka — 2 stĺpce, jedno políčko patrí textu. */
     private static function renderGrid(ImageManager $m, ImageInterface $c, array $photos, string $title, ?string $sub): void
     {
+        foreach (self::slots('grid') as $i => [$x, $y, $w, $h, $tilt]) {
+            if (isset($photos[$i])) {
+                self::place($m, $c, $photos[$i], $x, $y, $w, $h, $tilt, 0);
+            }
+        }
+
+        // Textové políčko je štvrté v mriežke 3×2 — medzi fotkami, nie nad nimi
         $pad = 40;
         $gap = 12;
         $cell = (int) ((self::W - 2 * $pad - $gap) / 2);
-        $top = 300;
-        $textIndex = 3;
+        $tx = $pad + ($cell + $gap);
+        $ty = 300 + ($cell + $gap);
 
-        $pi = 0;
-        for ($r = 0; $r < 3; $r++) {
-            for ($col = 0; $col < 2; $col++) {
-                $i = $r * 2 + $col;
-                $x = $pad + $col * ($cell + $gap);
-                $y = $top + $r * ($cell + $gap);
-
-                if ($i === $textIndex) {
-                    $c->drawRectangle(function ($rect) use ($cell, $x, $y) {
-                $rect->at($x, $y);
-                        $rect->size($cell, $cell);
-                        $rect->background(CollageBuilder::GREEN);
-                    });
-                    self::centeredText($c, $title, $x + $cell / 2, $y + $cell / 2 - 10, 58, self::PAPER, 'caveat');
-                    if ($sub) {
-                        self::centeredText($c, $sub, $x + $cell / 2, $y + $cell / 2 + 60, 22, self::PAPER, 'inter');
-                    }
-
-                    continue;
-                }
-
-                if (isset($photos[$pi])) {
-                    self::place($m, $c, $photos[$pi++], $x, $y, $cell, $cell, 0, 0);
-                }
-            }
+        $c->drawRectangle(function ($rect) use ($cell, $tx, $ty) {
+            $rect->at($tx, $ty);
+            $rect->size($cell, $cell);
+            $rect->background(CollageBuilder::GREEN);
+        });
+        self::centeredText($c, $title, $tx + $cell / 2, $ty + $cell / 2 - 10, 58, self::PAPER, 'caveat');
+        if ($sub) {
+            self::centeredText($c, $sub, $tx + $cell / 2, $ty + $cell / 2 + 60, 22, self::PAPER, 'inter');
         }
 
         self::brand($c, self::H - 120);
@@ -165,15 +253,11 @@ class CollageBuilder
     /** Polaroidy prilepené páskou. */
     private static function renderTape(ImageManager $m, ImageInterface $c, array $photos, string $title, ?string $sub): void
     {
-        $slots = [[130, 340, 560, 660], [400, 1090, 560, 620], [80, 1160, 280, 340]];
-
-        foreach ($photos as $i => $bytes) {
-            if (! isset($slots[$i])) {
+        foreach (self::slots('tape') as $i => [$x, $y, $w, $h, $tilt]) {
+            if (! isset($photos[$i])) {
                 break;
             }
-            [$x, $y, $w, $h] = $slots[$i];
-            $tilt = self::TILTS[$i % 6];
-            self::place($m, $c, $bytes, $x, $y, $w, $h, $tilt, 30);
+            self::place($m, $c, $photos[$i], $x, $y, $w, $h, $tilt, 30);
             // Páska sedí na hornej hrane, mierne pootočená oproti fotke
             self::tape($m, $c, (int) ($x + $w / 2), $y - 8, (int) ($w * 0.42), $tilt * 4, $i);
         }
@@ -185,38 +269,11 @@ class CollageBuilder
     /** Fotky rozsypané do tvaru srdca. */
     private static function renderHeart(ImageManager $m, ImageInterface $c, array $photos, string $title, ?string $sub): void
     {
-        $cx = self::W / 2;
-        $cy = 1000;
-        $scale = 32;
-        $size = 155;
-
-        // Sústredné prstence po krivke srdca — každý sa vykreslí celý, až potom
-        // sa prejde na menší. Miešanie mierok v jednom priechode obrys rozhádže.
-        $rings = [[15, 1.0], [8, 0.58], [3, 0.22]];
-
-        $i = 0;
-        foreach ($rings as [$count, $shrink]) {
-            for ($k = 0; $k < $count; $k++) {
-                if (! isset($photos[$i])) {
-                    break 2;
-                }
-
-                // Vnútorné prstence posunieme o pol kroku, nech fotky nesedia
-                // priamo pod tými z vonkajšieho.
-                $t = (($k + ($shrink < 1 ? 0.5 : 0)) / $count) * 2 * M_PI;
-                $hx = 16 * pow(sin($t), 3) * $shrink;
-                $hy = (13 * cos($t) - 5 * cos(2 * $t) - 2 * cos(3 * $t) - cos(4 * $t)) * $shrink;
-
-                self::place(
-                    $m, $c, $photos[$i],
-                    (int) ($cx + $hx * $scale - $size / 2),
-                    (int) ($cy - $hy * $scale - $size / 2),
-                    $size, $size,
-                    self::TILTS[$i % 6] * 2.2,
-                    14,
-                );
-                $i++;
+        foreach (self::slots('heart') as $i => [$x, $y, $w, $h, $tilt]) {
+            if (! isset($photos[$i])) {
+                break;
             }
+            self::place($m, $c, $photos[$i], $x, $y, $w, $h, $tilt, 14);
         }
 
         self::title($c, $title, 190);
@@ -238,7 +295,8 @@ class CollageBuilder
             $r->border(CollageBuilder::LINE, 2);
         });
 
-        self::place($m, $c, $photos[0], $cardX + 40, $cardY + 40, $cardW - 80, 820, 0, 0);
+        [$px, $py, $pw, $ph] = self::slots('player')[0];
+        self::place($m, $c, $photos[0], $px, $py, $pw, $ph, 0, 0);
 
         $textY = $cardY + 950;
         self::centeredText($c, $title, self::W / 2, $textY, 58, self::INK, 'caveat');
@@ -280,30 +338,19 @@ class CollageBuilder
     /** Fotky rozmiestnené ako dni v mesiaci. */
     private static function renderCalendar(ImageManager $m, ImageInterface $c, array $photos, string $title, ?string $sub): void
     {
-        $pad = 50;
-        $gap = 8;
-        $cols = 5;
-        $rows = 4;
-        $cell = (int) ((self::W - 2 * $pad - ($cols - 1) * $gap) / $cols);
-        $top = 420;
+        foreach (self::slots('calendar') as $i => [$x, $y, $w, $h, $tilt]) {
+            if (isset($photos[$i])) {
+                self::place($m, $c, $photos[$i], $x, $y, $w, $h, $tilt, 0);
 
-        for ($r = 0; $r < $rows; $r++) {
-            for ($col = 0; $col < $cols; $col++) {
-                $i = $r * $cols + $col;
-                $x = $pad + $col * ($cell + $gap);
-                $y = $top + $r * ($cell + $gap);
-
-                if (isset($photos[$i])) {
-                    self::place($m, $c, $photos[$i], $x, $y, $cell, $cell, 0, 0);
-                } else {
-                    // Prázdny deň — tlmené políčko, nech je vidieť rytmus mesiaca
-                    $c->drawRectangle(function ($rect) use ($cell, $x, $y) {
-                $rect->at($x, $y);
-                        $rect->size($cell, $cell);
-                        $rect->background('#eef2ee');
-                    });
-                }
+                continue;
             }
+
+            // Prázdny deň — tlmené políčko, nech je vidieť rytmus mesiaca
+            $c->drawRectangle(function ($rect) use ($w, $h, $x, $y) {
+                $rect->at($x, $y);
+                $rect->size($w, $h);
+                $rect->background('#eef2ee');
+            });
         }
 
         self::title($c, $title, 210);

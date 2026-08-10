@@ -38,6 +38,8 @@ class CollageController extends Controller
                     'key' => $key,
                     'label' => $labels[$key] ?? $key,
                     'photos' => $count,
+                    // Rozloženie políčok pre náhľad v appke (pomer 0–1)
+                    'slots' => CollageBuilder::slotsNormalized($key),
                 ])
                 ->values()
         );
@@ -95,9 +97,16 @@ class CollageController extends Controller
     private static function pickPhotos(array $data): array
     {
         if (! empty($data['photo_ids'])) {
-            return Photo::whereIn('id', $data['photo_ids'])
+            // Poradie určuje, ktorá fotka padne do ktorého políčka, takže sa musí
+            // zachovať presne tak, ako prišlo — databáza by vrátila svoje vlastné.
+            $byId = Photo::whereIn('id', $data['photo_ids'])
                 ->where('kind', 'image')
-                ->pluck('path')
+                ->pluck('path', 'id');
+
+            return collect($data['photo_ids'])
+                ->map(fn ($id) => $byId[$id] ?? null)
+                ->filter()
+                ->values()
                 ->all();
         }
 
