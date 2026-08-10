@@ -43,6 +43,8 @@ class CollageController extends Controller
                     'photos' => $count,
                     // Rozloženie políčok pre náhľad v appke (pomer 0–1)
                     'slots' => CollageBuilder::slotsNormalized($key),
+                    // Kde sedí nadpis a podtitul — appka ich tam rovno vypisuje
+                    'texts' => CollageBuilder::textSlots($key),
                 ])
                 ->values()
         );

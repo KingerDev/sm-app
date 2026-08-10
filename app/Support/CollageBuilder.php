@@ -134,6 +134,55 @@ class CollageBuilder
         };
     }
 
+    /**
+     * Kde na koláži sedí nadpis a podtitul — aby sa v appke dal písať priamo na
+     * miesto, kde naozaj bude, nie do samostatných políčok pod náhľadom.
+     *
+     * Vracia pomer 0–1 aj veľkosť písma a farbu.
+     */
+    public static function textSlots(string $template): array
+    {
+        // [y nadpisu, veľkosť, farba, y podtitulu, veľkosť, farba]
+        [$ty, $tsize, $tcolor, $sy, $ssize, $scolor] = match ($template) {
+            'grid' => self::gridTextPosition(),
+            'player' => [1250, 58, self::INK, 1310, 26, self::MUTED],
+            'heartfill' => [300, 88, self::ACCENT, self::H - 240, 34, self::INK],
+            'tape' => [180, 96, self::GREEN, self::H - 170, 34, self::INK],
+            'heart' => [190, 96, self::GREEN, self::H - 170, 34, self::INK],
+            'calendar' => [210, 96, self::GREEN, self::H - 170, 34, self::INK],
+            default => [150, 96, self::GREEN, self::H - 170, 34, self::INK],
+        };
+
+        return [
+            'title' => self::textBox($ty, $tsize, $tcolor, 'caveat'),
+            'subtitle' => self::textBox($sy, $ssize, $scolor, 'inter'),
+        ];
+    }
+
+    /** V mriežke je text v zelenom políčku, nie nad koláží. */
+    private static function gridTextPosition(): array
+    {
+        $pad = 40;
+        $gap = 12;
+        $cell = (int) ((self::W - 2 * $pad - $gap) / 2);
+        $cy = 300 + ($cell + $gap) + $cell / 2;
+
+        return [(int) ($cy - 10), 58, self::PAPER, (int) ($cy + 60), 22, self::PAPER];
+    }
+
+    private static function textBox(int $y, int $size, string $color, string $font): array
+    {
+        return [
+            'x' => 0.08,
+            'y' => round(($y - $size * 0.75) / self::H, 4),
+            'w' => 0.84,
+            'h' => round(($size * 1.5) / self::H, 4),
+            'size' => round($size / self::W, 4),
+            'color' => $color,
+            'font' => $font,
+        ];
+    }
+
     /** Políčka ako pomer 0–1 — pre náhľad v appke, nezávisle od rozlíšenia. */
     public static function slotsNormalized(string $template): array
     {
