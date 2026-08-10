@@ -193,14 +193,30 @@ class CollageBuilder
         $stepX = $areaW / $cols;
         $stepY = ($size + 6);
 
+        // Rozhodenie polohy a natočenia — aby to vyzeralo ako rozsypané fotky,
+        // nie ako mriežka. Odvodené od indexu, takže je to zakaždým rovnaké:
+        // náhodné hodnoty by pri každom generovaní dali inú koláž a znefunkčnili
+        // vyrovnávaciu pamäť.
+        $wobble = static function (int $i, int $seed): float {
+            $v = sin($i * 12.9898 + $seed * 78.233) * 43758.5453;
+
+            return ($v - floor($v)) * 2 - 1; // -1 .. 1
+        };
+
+        // Fotky sú väčšie než krok mriežky, takže sa mierne prekrývajú
+        $photoSize = (int) ($size * 1.16);
+
         $slots = [];
         foreach ($cells as $i => [$c, $r]) {
+            $jx = $wobble($i, 1) * $size * 0.14;
+            $jy = $wobble($i, 2) * $size * 0.14;
+
             $slots[] = [
-                (int) ($areaX + $c * $stepX + ($stepX - $size) / 2),
-                (int) ($areaY + $r * $stepY),
-                $size,
-                $size,
-                self::TILTS[$i % 6] * 0.8,
+                (int) ($areaX + $c * $stepX + ($stepX - $photoSize) / 2 + $jx),
+                (int) ($areaY + $r * $stepY + ($size - $photoSize) / 2 + $jy),
+                $photoSize,
+                $photoSize,
+                round($wobble($i, 3) * 11, 2),
             ];
         }
 
@@ -293,7 +309,7 @@ class CollageBuilder
             if (empty($photos[$i])) {
                 continue;
             }
-            self::place($m, $c, $photos[$i], $x, $y, $w, $h, $tilt, 14);
+            self::place($m, $c, $photos[$i], $x, $y, $w, $h, $tilt, 18);
         }
 
         self::title($c, $title, 190);
