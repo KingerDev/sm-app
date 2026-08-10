@@ -156,6 +156,9 @@ class CollageBuilder
         return [
             'title' => self::textBox($ty, $tsize, $tcolor, 'caveat'),
             'subtitle' => self::textBox($sy, $ssize, $scolor, 'inter'),
+            // Podklad pod textom, ak naň text sadá (mriežka má zelené políčko).
+            // Bez neho by bol v náhľade biely text na papieri neviditeľný.
+            'panel' => $template === 'grid' ? self::gridTextPanel() : null,
         ];
     }
 
@@ -168,6 +171,21 @@ class CollageBuilder
         $cy = 300 + ($cell + $gap) + $cell / 2;
 
         return [(int) ($cy - 10), 58, self::PAPER, (int) ($cy + 60), 22, self::PAPER];
+    }
+
+    private static function gridTextPanel(): array
+    {
+        $pad = 40;
+        $gap = 12;
+        $cell = (int) ((self::W - 2 * $pad - $gap) / 2);
+
+        return [
+            'x' => round(($pad + $cell + $gap) / self::W, 4),
+            'y' => round((300 + $cell + $gap) / self::H, 4),
+            'w' => round($cell / self::W, 4),
+            'h' => round($cell / self::H, 4),
+            'color' => self::GREEN,
+        ];
     }
 
     private static function textBox(int $y, int $size, string $color, string $font): array
