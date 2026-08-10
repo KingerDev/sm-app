@@ -54,7 +54,7 @@ class CollageController extends Controller
             'title' => 'required|string|max:60',
             'subtitle' => 'nullable|string|max:80',
             'source_type' => 'required|in:moment,month,photos',
-            'source_id' => 'nullable|string|max:60',
+            'source_id' => 'nullable|string|max:255',
             'photo_ids' => 'nullable|array|max:30',
             'photo_ids.*' => 'integer',
         ]);

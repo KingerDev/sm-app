@@ -220,7 +220,7 @@ class ApiTest extends TestCase
         $this->actingAs($this->actingUser());
 
         $moment = \App\Models\Moment::create([
-            'slug' => 'kolaz-flow', 'title' => 'Praha', 'place' => 'Praha',
+            'slug' => 'navsteva-demanovskej-jaskyne-slobody-teda-vlastne-lumina-verse-2026', 'title' => 'Praha', 'place' => 'Praha',
             'place_short' => 'Praha', 'date_start' => '2026-05-02', 'date_display' => '2. máj 2026',
             'date_short' => 'máj 2026', 'seed' => 'default',
         ]);
@@ -247,7 +247,7 @@ class ApiTest extends TestCase
             'title' => 'Praha 2026',
             'subtitle' => 'prvý spoločný výlet',
             'source_type' => 'moment',
-            'source_id' => 'kolaz-flow',
+            'source_id' => 'navsteva-demanovskej-jaskyne-slobody-teda-vlastne-lumina-verse-2026',
         ])->assertCreated();
 
         $id = $res->json('id');
