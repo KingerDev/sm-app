@@ -75,6 +75,9 @@ Route::prefix('v1')->group(function () {
         Route::delete('/capsules/{slug}', [CapsuleController::class, 'destroy']);
 
         Route::get('/wrapped', [WrappedController::class, 'index']);
+        // Ročná koláž musí byť pred {wrappedId}, inak by ju pohltil ten parameter.
+        Route::get('/wrapped/year/{year}/collage', [WrappedController::class, 'yearCollage'])->whereNumber('year');
+        Route::get('/wrapped/{wrappedId}/collage', [WrappedController::class, 'collage']);
         Route::get('/wrapped/{wrappedId}', [WrappedController::class, 'show']);
     });
 });

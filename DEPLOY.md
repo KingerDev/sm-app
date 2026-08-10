@@ -128,7 +128,7 @@ php artisan config:cache && php artisan route:cache
 Adresa API je v `sm_app/.env`:
 
 ```
-EXPO_PUBLIC_API_URL=https://api.kinger.dev
+EXPO_PUBLIC_API_URL=https://sm-app.kinger.dev
 ```
 
 Je to jediné miesto, kde sa nastavuje — `src/config.ts` ju odtiaľ číta a zvyšok

@@ -172,4 +172,45 @@ class ApiTest extends TestCase
         $this->assertContains('milestone', $kinds);
         $this->assertContains('plan', $kinds);
     }
+
+    public function test_monthly_collage_is_generated_from_moment_photos(): void
+    {
+        \Storage::fake('public');
+        $this->actingAs($this->actingUser());
+
+        $moment = \App\Models\Moment::create([
+            'slug' => 'kolaz-test', 'title' => 'Koláž test', 'place' => 'Praha',
+            'place_short' => 'Praha', 'date_start' => '2026-03-14', 'date_display' => '14. marec 2026',
+            'date_short' => 'mar 2026', 'seed' => 'default',
+        ]);
+
+        // Dve skutočné fotky na disku — koláž ich musí vedieť načítať a poskladať.
+        foreach ([1, 2] as $i) {
+            $img = imagecreatetruecolor(600, 400);
+            imagefill($img, 0, 0, imagecolorallocate($img, 40 * $i, 90, 60));
+            ob_start();
+            imagejpeg($img);
+            $bytes = ob_get_clean();
+
+            $path = "photos/moments/kolaz-{$i}.jpg";
+            \Storage::disk('public')->put($path, $bytes);
+            $moment->photos()->create(['path' => $path, 'kind' => 'image', 'sort_order' => $i]);
+        }
+
+        $res = $this->getJson('/api/v1/wrapped/2026-03/collage')->assertOk();
+        $this->assertSame(2, $res->json('photos'));
+        $this->assertNotNull($res->json('url'), 'koláž sa nevygenerovala');
+
+        // Súbor musí naozaj vzniknúť a mať rozmery story
+        $files = \Storage::disk('public')->files('collages');
+        $this->assertCount(1, $files);
+        [$w, $h] = getimagesizefromstring(\Storage::disk('public')->get($files[0]));
+        $this->assertSame([1080, 1920], [$w, $h]);
+    }
+
+    public function test_collage_for_unknown_month_is_not_found(): void
+    {
+        $this->actingAs($this->actingUser());
+        $this->getJson('/api/v1/wrapped/1999-01/collage')->assertNotFound();
+    }
 }
