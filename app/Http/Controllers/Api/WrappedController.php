@@ -41,10 +41,11 @@ class WrappedController extends Controller
 
         $start = Carbon::createFromFormat('Y-m-d', $wrappedId.'-01')->startOfMonth();
 
+        // Podtitul je len headline — počet fotiek už obsahuje, inak by tam bol dvakrát.
         return $this->render(
             self::bestPhotos($start, $start->copy()->endOfMonth()),
             $wrapped['label'],
-            $wrapped['photos_count'].' fotiek · '.$wrapped['headline'],
+            $wrapped['headline'],
         );
     }
 
