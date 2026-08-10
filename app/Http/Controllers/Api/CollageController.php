@@ -10,7 +10,9 @@ use App\Support\CollageBuilder;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 class CollageController extends Controller
 {
@@ -44,6 +46,37 @@ class CollageController extends Controller
                 ])
                 ->values()
         );
+    }
+
+    /**
+     * Ukážka dizajnu z vlastných fotiek — aby bolo v prehľade vidieť, ako bude
+     * koláž naozaj vyzerať. Generuje sa na požiadanie a zvlášť pre každý dizajn;
+     * všetkých sedem naraz by prvé otvorenie zdržalo o desiatky sekúnd.
+     */
+    public function preview(string $key): JsonResponse
+    {
+        if (! isset(CollageBuilder::TEMPLATES[$key])) {
+            throw new NotFoundHttpException("Dizajn {$key} neexistuje.");
+        }
+
+        // Zámerne najstaršie fotky — výber sa tak nemení pri každom nahratí
+        // a ukážka sa negeneruje znova.
+        $paths = Photo::where('photoable_type', Moment::class)
+            ->where('kind', 'image')
+            ->orderBy('id')
+            ->limit(CollageBuilder::TEMPLATES[$key])
+            ->pluck('path')
+            ->all();
+
+        if (! $paths) {
+            return response()->json(['url' => null]);
+        }
+
+        $path = CollageBuilder::make($paths, 'ukážka', 'takto to bude vyzerať', $key);
+
+        return response()->json([
+            'url' => $path ? Storage::disk(config('filesystems.media'))->url($path) : null,
+        ]);
     }
 
     /**

@@ -77,6 +77,7 @@ Route::prefix('v1')->group(function () {
 
         Route::get('/collages', [CollageController::class, 'index']);
         Route::get('/collages/templates', [CollageController::class, 'templates']);
+        Route::get('/collages/templates/{key}/preview', [CollageController::class, 'preview']);
         Route::post('/collages', [CollageController::class, 'store']);
         Route::delete('/collages/{id}', [CollageController::class, 'destroy']);
 
