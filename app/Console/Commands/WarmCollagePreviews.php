@@ -36,7 +36,13 @@ class WarmCollagePreviews extends Command
             }
 
             $t0 = microtime(true);
-            $path = CollageBuilder::make($paths, 'ukážka', 'takto to bude vyzerať', $key);
+            $path = CollageBuilder::make(
+                $paths,
+                'ukážka',
+                'takto to bude vyzerať',
+                $key,
+                CollageBuilder::sampleCaptions($key),
+            );
 
             $this->line(sprintf(
                 '  %-10s %s  %.1fs',

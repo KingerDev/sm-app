@@ -321,4 +321,59 @@ class ApiTest extends TestCase
         $this->assertTrue($isRed($slots[3]), 'fotka nie je v políčku, kam patrí');
         $this->assertFalse($isRed($slots[0]), 'fotka sa posunula do prvého políčka');
     }
+
+    public function test_caption_is_written_under_the_photo_it_belongs_to(): void
+    {
+        \Storage::fake('public');
+        $this->actingAs($this->actingUser());
+
+        $moment = \App\Models\Moment::create([
+            'slug' => 'popisky', 'title' => 'Popisky', 'place' => 'Praha', 'place_short' => 'Praha',
+            'date_start' => '2026-07-01', 'date_display' => '1. júl 2026', 'date_short' => 'júl 2026',
+            'seed' => 'default',
+        ]);
+
+        $ids = [];
+        foreach ([1, 2, 3] as $i) {
+            $img = imagecreatetruecolor(400, 400);
+            imagefill($img, 0, 0, imagecolorallocate($img, 200, 40, 40));
+            ob_start();
+            imagejpeg($img);
+            \Storage::disk('public')->put("photos/moments/cap-{$i}.jpg", ob_get_clean());
+            $ids[] = $moment->photos()->create(['path' => "photos/moments/cap-{$i}.jpg", 'kind' => 'image'])->id;
+        }
+
+        // Popisok len pod treťou fotkou — pod prvou nesmie skončiť nič
+        $res = $this->postJson('/api/v1/collages', [
+            'template' => 'caption',
+            'title' => 'Popisky',
+            'source_type' => 'photos',
+            'photo_ids' => $ids,
+            'captions' => [null, null, 'HHHHHHH'],
+        ])->assertCreated();
+
+        $collage = \App\Models\Collage::find($res->json('id'));
+        $img = imagecreatefromstring(\Storage::disk('public')->get($collage->path));
+
+        // Popisok je tmavý text v bielom okraji pod fotkou — stačí spočítať,
+        // koľko tmavých bodov v tom páse je.
+        $inkPixels = function (array $slot) use ($img) {
+            $count = 0;
+            for ($y = $slot[1] + $slot[3] + 30; $y < $slot[1] + $slot[3] + 90; $y += 2) {
+                for ($x = $slot[0]; $x < $slot[0] + $slot[2]; $x += 2) {
+                    $rgb = imagecolorat($img, (int) $x, (int) $y);
+                    if ((($rgb >> 16) & 0xFF) < 110 && (($rgb >> 8) & 0xFF) < 110) {
+                        $count++;
+                    }
+                }
+            }
+
+            return $count;
+        };
+
+        $slots = \App\Support\CollageBuilder::slots('caption');
+
+        $this->assertGreaterThan(40, $inkPixels($slots[2]), 'popisok sa pod tretiu fotku nedostal');
+        $this->assertLessThan(10, $inkPixels($slots[0]), 'popisok skončil pod nesprávnou fotkou');
+    }
 }

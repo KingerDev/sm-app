@@ -35,6 +35,7 @@ class CollageController extends Controller
             'calendar' => 'Kalendár mesiaca',
             'scrapbook' => 'Scrapbook',
             'travel' => 'Naše cesty',
+            'caption' => 'Polaroidy s popiskom',
         ];
 
         return response()->json(
@@ -76,7 +77,7 @@ class CollageController extends Controller
             return response()->json(['url' => null]);
         }
 
-        $path = CollageBuilder::make($paths, 'ukážka', 'takto to bude vyzerať', $key);
+        $path = CollageBuilder::make($paths, 'ukážka', 'takto to bude vyzerať', $key, CollageBuilder::sampleCaptions($key));
 
         return response()->json([
             'url' => $path ? Storage::disk(config('filesystems.media'))->url($path) : null,
@@ -97,6 +98,9 @@ class CollageController extends Controller
             'source_id' => 'nullable|string|max:255',
             'photo_ids' => 'nullable|array|max:30',
             'photo_ids.*' => 'nullable|integer',
+            // Popisky pod jednotlivými fotkami — index určuje políčko šablóny
+            'captions' => 'nullable|array|max:30',
+            'captions.*' => 'nullable|string|max:24',
         ]);
 
         $paths = self::pickPhotos($data);
@@ -105,7 +109,13 @@ class CollageController extends Controller
             return response()->json(['message' => 'Pre tento výber sa nenašli žiadne fotky.'], 422);
         }
 
-        $path = CollageBuilder::make($paths, $data['title'], $data['subtitle'] ?? null, $data['template']);
+        $path = CollageBuilder::make(
+            $paths,
+            $data['title'],
+            $data['subtitle'] ?? null,
+            $data['template'],
+            $data['captions'] ?? [],
+        );
 
         if (! $path) {
             return response()->json(['message' => 'Koláž sa nepodarilo vytvoriť.'], 500);

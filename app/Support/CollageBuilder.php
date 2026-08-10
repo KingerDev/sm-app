@@ -34,6 +34,7 @@ class CollageBuilder
         'calendar' => 20,
         'scrapbook' => 4,
         'travel' => 5,
+        'caption' => 3,
     ];
 
     private const PAPER = '#fafaf7';
@@ -46,11 +47,23 @@ class CollageBuilder
 
     private const TILTS = [-2.5, 2.0, -1.5, 2.8, -2.0, 1.6];
 
+    /** Biely okraj polaroidu — dole širší, aby sa doň zmestil popisok. */
+    private const POLAROID_PAD = 26;
+
+    private const POLAROID_BOTTOM = 108;
+
+    private const CAPTION_SIZE = 54;
+
+    /**
+     * @param  array<int, string|null>  $captions  Popisky pod jednotlivými fotkami
+     *                                             (len šablóny, ktoré ich majú).
+     */
     public static function make(
         array $photoPaths,
         string $title,
         ?string $subtitle = null,
         string $template = 'polaroid',
+        array $captions = [],
     ): ?string {
         // Prázdne miesta zostávajú prázdne — index určuje políčko šablóny.
         if (! array_filter($photoPaths)) {
@@ -69,6 +82,7 @@ class CollageBuilder
                 .'|'.md5(json_encode(self::slots($template)))
                 .'|'.implode('|', array_map(fn ($p) => (string) $p, $photoPaths))
                 .'|'.$title.'|'.$subtitle
+                .'|'.implode('~', array_map(fn ($t) => (string) $t, $captions))
             ),
             0,
             24
@@ -100,6 +114,7 @@ class CollageBuilder
             'calendar' => self::renderCalendar($manager, $canvas, $photos, $title, $subtitle),
             'scrapbook' => self::renderScrapbook($manager, $canvas, $photos, $title, $subtitle),
             'travel' => self::renderTravel($manager, $canvas, $photos, $title, $subtitle),
+            'caption' => self::renderCaption($manager, $canvas, $photos, $captions),
             default => self::renderPolaroid($manager, $canvas, $photos, $title, $subtitle),
         };
 
@@ -135,6 +150,11 @@ class CollageBuilder
                 [90, 1130, 380, 460, 1.8],
                 [560, 320, 420, 480, 3.5],
             ],
+            'caption' => [
+                [170, 285, 380, 555, -1.5],
+                [560, 645, 385, 560, 1.2],
+                [235, 1080, 385, 560, -1.0],
+            ],
             'travel' => [
                 [80, 520, 300, 300, -3.0],
                 [420, 430, 280, 280, 2.0],
@@ -159,6 +179,12 @@ class CollageBuilder
      */
     public static function textSlots(string $template): array
     {
+        // Šablóny s popiskami pod fotkami spoločný nadpis nemajú — text je
+        // súčasťou jednotlivých polaroidov.
+        if ($captions = self::captionSlots($template)) {
+            return ['title' => null, 'subtitle' => null, 'panel' => null, 'captions' => $captions];
+        }
+
         // [y nadpisu, veľkosť, farba, y podtitulu, veľkosť, farba]
         [$ty, $tsize, $tcolor, $sy, $ssize, $scolor] = match ($template) {
             'grid' => self::gridTextPosition(),
@@ -180,7 +206,42 @@ class CollageBuilder
             // Podklad pod textom, ak naň text sadá (mriežka má zelené políčko).
             // Bez neho by bol v náhľade biely text na papieri neviditeľný.
             'panel' => $panel,
+            'captions' => [],
         ];
+    }
+
+    /**
+     * Popisky v bielom okraji pod fotkami — pomer 0–1, aby ich appka vedela
+     * vykresliť presne tam, kde na koláži naozaj budú.
+     *
+     * Okrem textového políčka vracia aj obrys celej polaroidovej kartičky; bez
+     * neho by bol popisok v náhľade tmavým textom na papieri, nie na rámiku.
+     */
+    public static function captionSlots(string $template): array
+    {
+        if ($template !== 'caption') {
+            return [];
+        }
+
+        $pad = self::POLAROID_PAD;
+        $bottom = self::POLAROID_BOTTOM;
+
+        return array_map(fn (array $s) => [
+            'x' => round(($s[0] - $pad) / self::W, 4),
+            'y' => round(($s[1] + $s[3]) / self::H, 4),
+            'w' => round(($s[2] + 2 * $pad) / self::W, 4),
+            'h' => round($bottom / self::H, 4),
+            'size' => round(self::CAPTION_SIZE / self::W, 4),
+            'color' => self::INK,
+            'font' => 'caveat',
+            'tilt' => $s[4],
+            'card' => [
+                'x' => round(($s[0] - $pad) / self::W, 4),
+                'y' => round(($s[1] - $pad) / self::H, 4),
+                'w' => round(($s[2] + 2 * $pad) / self::W, 4),
+                'h' => round(($s[3] + $pad + $bottom) / self::H, 4),
+            ],
+        ], self::slots($template));
     }
 
     /** V mriežke je text v zelenom políčku, nie nad koláží. */
@@ -640,7 +701,98 @@ class CollageBuilder
         self::footer($c, $sub);
     }
 
+    /**
+     * Polaroidy nalepené cez seba, každý s vlastným popiskom v spodnom okraji.
+     *
+     * Poradie je zámerne odzadu: neskoršie fotky prekrývajú skoršie, takže
+     * kartičky pôsobia naozaj naukladané, nie len rozložené vedľa seba.
+     */
+    private static function renderCaption(ImageManager $m, ImageInterface $c, array $photos, array $captions): void
+    {
+        // Páska sa lepí od ruky, nie presne do stredu — každá kartička inak
+        $offsets = [-0.06, -0.18, -0.26];
+
+        foreach (self::slots('caption') as $i => [$x, $y, $w, $h, $tilt]) {
+            if (empty($photos[$i])) {
+                continue;
+            }
+
+            self::polaroid($m, $c, $photos[$i], $x, $y, $w, $h, $tilt, $captions[$i] ?? null);
+            self::tape(
+                $m,
+                $c,
+                (int) ($x + $w * (0.5 + ($offsets[$i] ?? 0))),
+                $y - self::POLAROID_PAD - 14,
+                (int) ($w * 0.44),
+                $tilt * 5 - 4,
+                $i
+            );
+        }
+
+        self::brand($c, self::H - 90);
+    }
+
+    /** Popisky do ukážky dizajnu, nech je vidieť, že sa dajú písať pod fotky. */
+    public static function sampleCaptions(string $template): array
+    {
+        return self::captionSlots($template) ? ['spolu', 'navždy', 'my dvaja'] : [];
+    }
+
     // -------------------------------------------------------------- pomocníci
+
+    /**
+     * Polaroidová kartička: biely okraj, dole širší, a v ňom popisok.
+     *
+     * Kartička sa skladá ako samostatný obrázok a otáča sa až celá — inak by
+     * popisok zostal rovno, kým fotka nad ním by bola nakrivo.
+     */
+    private static function polaroid(
+        ImageManager $m,
+        ImageInterface $canvas,
+        string $bytes,
+        int $x,
+        int $y,
+        int $w,
+        int $h,
+        float $tilt,
+        ?string $caption,
+    ): void {
+        $photo = rescue(fn () => $m->decodeBinary($bytes)->cover($w, $h), null, false);
+        if (! $photo) {
+            return;
+        }
+
+        $pad = self::POLAROID_PAD;
+        $bottom = self::POLAROID_BOTTOM;
+        $cardW = $w + 2 * $pad;
+        $cardH = $h + $pad + $bottom;
+
+        $card = $m->createImage($cardW, $cardH)->fill(self::FRAME);
+        $card->insert($photo, $pad, $pad, 'top-left');
+
+        if ($caption) {
+            self::centeredText(
+                $card,
+                $caption,
+                $cardW / 2,
+                $pad + $h + $bottom * 0.62,
+                self::CAPTION_SIZE,
+                self::INK,
+                'caveat'
+            );
+        }
+
+        if (abs($tilt) > 0.01) {
+            $card = $card->rotate($tilt, 'rgba(0,0,0,0)');
+        }
+
+        $canvas->insert(
+            $card,
+            (int) ($x - $pad - ($card->width() - $cardW) / 2),
+            (int) ($y - $pad - ($card->height() - $cardH) / 2),
+            'top-left',
+        );
+    }
 
     /**
      * Vloží ozdobu z resources/collage. $cx/$cy je stred, $width cieľová šírka.
