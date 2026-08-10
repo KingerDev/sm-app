@@ -33,6 +33,8 @@ class CollageController extends Controller
             'heartfill' => 'Srdce (výplň)',
             'player' => 'Prehrávač',
             'calendar' => 'Kalendár mesiaca',
+            'scrapbook' => 'Scrapbook',
+            'travel' => 'Naše cesty',
         ];
 
         return response()->json(

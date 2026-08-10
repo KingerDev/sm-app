@@ -32,6 +32,8 @@ class CollageBuilder
         'heartfill' => 6,
         'player' => 1,
         'calendar' => 20,
+        'scrapbook' => 4,
+        'travel' => 5,
     ];
 
     private const PAPER = '#fafaf7';
@@ -87,7 +89,7 @@ class CollageBuilder
         }
 
         $manager = new ImageManager(new GdDriver());
-        $canvas = $manager->createImage(self::W, self::H)->fill(self::PAPER);
+        $canvas = self::paperCanvas($manager, $template);
 
         match ($template) {
             'grid' => self::renderGrid($manager, $canvas, $photos, $title, $subtitle),
@@ -96,6 +98,8 @@ class CollageBuilder
             'heart' => self::renderHeart($manager, $canvas, $photos, $title, $subtitle),
             'player' => self::renderPlayer($manager, $canvas, $photos, $title, $subtitle),
             'calendar' => self::renderCalendar($manager, $canvas, $photos, $title, $subtitle),
+            'scrapbook' => self::renderScrapbook($manager, $canvas, $photos, $title, $subtitle),
+            'travel' => self::renderTravel($manager, $canvas, $photos, $title, $subtitle),
             default => self::renderPolaroid($manager, $canvas, $photos, $title, $subtitle),
         };
 
@@ -125,6 +129,19 @@ class CollageBuilder
             'heartfill' => self::heartFillSlots(),
             'player' => [[130, 340, 820, 820, 0.0]],
             'calendar' => self::calendarSlots(),
+            'scrapbook' => [
+                [110, 430, 520, 620, -3.0],
+                [520, 900, 470, 560, 2.5],
+                [90, 1130, 380, 460, 1.8],
+                [560, 320, 420, 480, 3.5],
+            ],
+            'travel' => [
+                [80, 520, 300, 300, -3.0],
+                [420, 430, 280, 280, 2.0],
+                [740, 560, 270, 270, -2.0],
+                [190, 900, 290, 290, 2.6],
+                [560, 960, 320, 320, -1.6],
+            ],
             default => [
                 [90, 300, 430, 560, -2.5],
                 [560, 340, 430, 560, 2.0],
@@ -326,6 +343,32 @@ class CollageBuilder
         }
 
         return $slots;
+    }
+
+    /**
+     * Plátno s papierovou textúrou. Textúra sa vkladá slabo krycia — má dodať
+     * zrno, nie prefarbiť koláž. Keď podklad chýba, ostane plochá farba.
+     */
+    private static function paperCanvas(ImageManager $m, string $template): ImageInterface
+    {
+        $canvas = $m->createImage(self::W, self::H)->fill(self::PAPER);
+
+        $files = glob(resource_path('collage/paper/*.jpg')) ?: [];
+        if (! $files) {
+            return $canvas;
+        }
+
+        sort($files);
+        // Podklad podľa šablóny, nie náhodne — inak by tá istá koláž vyzerala
+        // pri každom generovaní inak a vyrovnávacia pamäť by strácala zmysel.
+        $file = $files[abs(crc32($template)) % count($files)];
+
+        $texture = rescue(fn () => $m->decodePath($file)->cover(self::W, self::H), null, false);
+        if ($texture) {
+            $canvas->insert($texture, 0, 0, 'top-left', 0.22);
+        }
+
+        return $canvas;
     }
 
     // ---------------------------------------------------------------- šablóny
@@ -549,7 +592,95 @@ class CollageBuilder
         self::brand($c, self::H - 150);
     }
 
+    /** Scrapbook — roztrhaný papier, páska, lisované kvety a spinka. */
+    private static function renderScrapbook(ImageManager $m, ImageInterface $c, array $photos, string $title, ?string $sub): void
+    {
+        // Útržok papiera pod nadpisom
+        self::decor($m, $c, 'torn/paper-01.png', 520, self::W / 2, 250, -1.5, 0.92);
+
+        foreach (self::slots('scrapbook') as $i => [$x, $y, $w, $h, $tilt]) {
+            if (empty($photos[$i])) {
+                continue;
+            }
+            self::place($m, $c, $photos[$i], $x, $y, $w, $h, $tilt, 28);
+
+            // Prvé dve fotky pripevníme páskou, tretiu spinkou
+            if ($i < 2) {
+                self::tape($m, $c, (int) ($x + $w / 2), $y - 6, (int) ($w * 0.4), $tilt * 4, $i);
+            } elseif ($i === 2) {
+                self::decor($m, $c, 'stickers/clip-01.png', 90, $x + $w - 40, $y - 10, 18, 1.0);
+            }
+        }
+
+        // Kvety do rohov, hviezdička ako drobnosť
+        self::decor($m, $c, 'flowers/flower-02.png', 260, 940, 640, 14, 1.0);
+        self::decor($m, $c, 'flowers/flower-01.png', 200, 130, 1010, -22, 1.0);
+        self::decor($m, $c, 'stickers/star-01.png', 110, 960, 1560, 8, 1.0);
+
+        self::centeredText($c, $title, self::W / 2, 255, 92, self::GREEN, 'caveat');
+        self::footer($c, $sub);
+    }
+
+    /** Cesty — fotky rozsypané nad mapou sveta. */
+    private static function renderTravel(ImageManager $m, ImageInterface $c, array $photos, string $title, ?string $sub): void
+    {
+        // Mapa slabo krycia, aby fungovala ako podklad a nie ako hlavný motív
+        self::decor($m, $c, 'map/world-01.png', 1060, self::W / 2, 900, 0, 0.34);
+
+        foreach (self::slots('travel') as $i => [$x, $y, $w, $h, $tilt]) {
+            if (empty($photos[$i])) {
+                continue;
+            }
+            self::place($m, $c, $photos[$i], $x, $y, $w, $h, $tilt, 22);
+        }
+
+        self::decor($m, $c, 'flowers/flower-03.png', 150, 940, 1500, 12, 0.9);
+
+        self::title($c, $title, 230);
+        self::footer($c, $sub);
+    }
+
     // -------------------------------------------------------------- pomocníci
+
+    /**
+     * Vloží ozdobu z resources/collage. $cx/$cy je stred, $width cieľová šírka.
+     * Chýbajúci podklad koláž nezhodí — ozdoba sa len vynechá.
+     */
+    private static function decor(
+        ImageManager $m,
+        ImageInterface $canvas,
+        string $relative,
+        int $width,
+        float $cx,
+        float $cy,
+        float $tilt = 0,
+        float $opacity = 1.0,
+    ): void {
+        $file = resource_path('collage/'.$relative);
+        if (! is_file($file)) {
+            return;
+        }
+
+        $img = rescue(fn () => $m->decodePath($file), null, false);
+        if (! $img) {
+            return;
+        }
+
+        $img->scale(width: $width);
+
+        if (abs($tilt) > 0.01) {
+            $img = $img->rotate($tilt, 'rgba(0,0,0,0)');
+        }
+
+        $canvas->insert(
+            $img,
+            (int) ($cx - $img->width() / 2),
+            (int) ($cy - $img->height() / 2),
+            'top-left',
+            $opacity,
+        );
+    }
+
 
     /** Trojuholník pre ikony prehrávača. $dir 1 = doprava, −1 = doľava. */
     private static function triangle(ImageInterface $c, int $cx, int $cy, int $size, int $dir, string $color): void
