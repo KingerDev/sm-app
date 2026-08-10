@@ -377,11 +377,28 @@ class CollageBuilder
 
         $btnY = $barY + 110;
         foreach ([-160, 0, 160] as $k => $dx) {
-            $c->drawCircle(function ($d) use ($btnY, $dx, $k) {
-                $d->at((int) (self::W / 2 + $dx), $btnY);
-                $d->radius($k === 1 ? 46 : 26);
-                $d->background($k === 1 ? CollageBuilder::GREEN : CollageBuilder::LINE);
+            $cx = (int) (self::W / 2 + $dx);
+            $main = $k === 1;
+
+            $c->drawCircle(function ($d) use ($btnY, $cx, $main) {
+                $d->at($cx, $btnY);
+                $d->radius($main ? 46 : 26);
+                $d->background($main ? CollageBuilder::GREEN : CollageBuilder::LINE);
             });
+
+            // Ikony kreslíme ako tvary — písma na serveri prehrávacie symboly nemajú
+            if ($main) {
+                self::triangle($c, $cx + 4, $btnY, 30, 1, self::PAPER);
+            } else {
+                $dir = $k === 0 ? -1 : 1;
+                self::triangle($c, $cx + 3 * $dir, $btnY, 16, $dir, self::MUTED);
+                // Zvislá čiarka na konci, ako majú tlačidlá pre predošlú/ďalšiu
+                $c->drawRectangle(function ($r) use ($cx, $btnY, $dir) {
+                    $r->at($cx + ($dir > 0 ? 11 : -14), $btnY - 8);
+                    $r->size(3, 16);
+                    $r->background(CollageBuilder::MUTED);
+                });
+            }
         }
 
         self::brand($c, self::H - 90);
@@ -462,6 +479,19 @@ class CollageBuilder
     }
 
     // -------------------------------------------------------------- pomocníci
+
+    /** Trojuholník pre ikony prehrávača. $dir 1 = doprava, −1 = doľava. */
+    private static function triangle(ImageInterface $c, int $cx, int $cy, int $size, int $dir, string $color): void
+    {
+        $half = (int) ($size / 2);
+
+        $c->drawPolygon(function ($p) use ($cx, $cy, $half, $dir, $color) {
+            $p->point($cx - $half * $dir, $cy - $half);
+            $p->point($cx - $half * $dir, $cy + $half);
+            $p->point($cx + $half * $dir, $cy);
+            $p->background($color);
+        });
+    }
 
     /** Vloží fotku s voliteľným bielym rámikom a pootočením. */
     private static function place(
