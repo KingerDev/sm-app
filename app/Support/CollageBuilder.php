@@ -153,12 +153,16 @@ class CollageBuilder
             default => [150, 96, self::GREEN, self::H - 170, 34, self::INK],
         };
 
+        // Pri mriežke je text vycentrovaný v zelenom políčku, nie cez celú šírku
+        $panel = $template === 'grid' ? self::gridTextPanel() : null;
+        $box = $panel ? [$panel['x'], $panel['w']] : [0.08, 0.84];
+
         return [
-            'title' => self::textBox($ty, $tsize, $tcolor, 'caveat'),
-            'subtitle' => self::textBox($sy, $ssize, $scolor, 'inter'),
+            'title' => self::textBox($ty, $tsize, $tcolor, 'caveat', $box),
+            'subtitle' => self::textBox($sy, $ssize, $scolor, 'inter', $box),
             // Podklad pod textom, ak naň text sadá (mriežka má zelené políčko).
             // Bez neho by bol v náhľade biely text na papieri neviditeľný.
-            'panel' => $template === 'grid' ? self::gridTextPanel() : null,
+            'panel' => $panel,
         ];
     }
 
@@ -188,12 +192,12 @@ class CollageBuilder
         ];
     }
 
-    private static function textBox(int $y, int $size, string $color, string $font): array
+    private static function textBox(int $y, int $size, string $color, string $font, array $box): array
     {
         return [
-            'x' => 0.08,
+            'x' => $box[0],
             'y' => round(($y - $size * 0.75) / self::H, 4),
-            'w' => 0.84,
+            'w' => $box[1],
             'h' => round(($size * 1.5) / self::H, 4),
             'size' => round($size / self::W, 4),
             'color' => $color,
