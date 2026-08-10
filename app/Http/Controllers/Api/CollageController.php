@@ -27,7 +27,8 @@ class CollageController extends Controller
             'polaroid' => 'Rozsypané fotky',
             'grid' => 'Mriežka',
             'tape' => 'Nalepené páskou',
-            'heart' => 'Srdce',
+            'heart' => 'Srdce z fotiek',
+            'heartfill' => 'Srdce (výplň)',
             'player' => 'Prehrávač',
             'calendar' => 'Kalendár mesiaca',
         ];

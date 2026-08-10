@@ -29,6 +29,7 @@ class CollageBuilder
         'grid' => 5,
         'tape' => 3,
         'heart' => 27,
+        'heartfill' => 6,
         'player' => 1,
         'calendar' => 20,
     ];
@@ -37,6 +38,7 @@ class CollageBuilder
     private const GREEN = '#2d5a3d';
     private const INK = '#3a3a36';
     private const MUTED = '#6b6862';
+    private const ACCENT = '#b85a1b';
     private const FRAME = '#ffffff';
     private const LINE = '#e8e4d9';
 
@@ -89,6 +91,7 @@ class CollageBuilder
 
         match ($template) {
             'grid' => self::renderGrid($manager, $canvas, $photos, $title, $subtitle),
+            'heartfill' => self::renderHeartFill($manager, $canvas, $photos, $title, $subtitle),
             'tape' => self::renderTape($manager, $canvas, $photos, $title, $subtitle),
             'heart' => self::renderHeart($manager, $canvas, $photos, $title, $subtitle),
             'player' => self::renderPlayer($manager, $canvas, $photos, $title, $subtitle),
@@ -119,6 +122,7 @@ class CollageBuilder
                 [80, 1160, 280, 340, -1.5],
             ],
             'heart' => self::heartSlots(),
+            'heartfill' => self::heartFillSlots(),
             'player' => [[130, 340, 820, 820, 0.0]],
             'calendar' => self::calendarSlots(),
             default => [
@@ -221,6 +225,34 @@ class CollageBuilder
         }
 
         return $slots;
+    }
+
+    /** Mozaika, ktorá sa oreže do tvaru srdca. Súradnice sú na plátne. */
+    private static function heartFillSlots(): array
+    {
+        [$x, $y, $w, $h] = self::heartBox();
+
+        $r1 = (int) ($h * 0.38);
+        $r2 = (int) ($h * 0.32);
+        $r3 = $h - $r1 - $r2;
+
+        return [
+            [$x, $y, (int) ($w * 0.55), $r1, 0.0],
+            [$x + (int) ($w * 0.55), $y, $w - (int) ($w * 0.55), $r1, 0.0],
+            [$x, $y + $r1, (int) ($w * 0.30), $r2, 0.0],
+            [$x + (int) ($w * 0.30), $y + $r1, (int) ($w * 0.40), $r2, 0.0],
+            [$x + (int) ($w * 0.70), $y + $r1, $w - (int) ($w * 0.70), $r2, 0.0],
+            [$x, $y + $r1 + $r2, $w, $r3, 0.0],
+        ];
+    }
+
+    /** Obdĺžnik, do ktorého sa srdce vpisuje: [x, y, šírka, výška]. */
+    private static function heartBox(): array
+    {
+        $w = 1000;
+        $h = 1160;
+
+        return [(int) ((self::W - $w) / 2), 430, $w, $h];
     }
 
     private static function calendarSlots(): array
@@ -392,6 +424,57 @@ class CollageBuilder
         self::title($c, $title, 210);
         self::centeredText($c, 'p o    u t    s t    š t    p i', self::W / 2, 350, 26, self::MUTED, 'inter');
         self::footer($c, $sub);
+    }
+
+    /**
+     * Fotky poskladané do mozaiky a orezané do tvaru srdca.
+     *
+     * GD nemá alfa masku, tak to robíme po riadkoch: pre každý riadok nájdeme
+     * úseky, ktoré padnú dovnútra tvaru, a skopírujeme len tie. Vďaka tomu
+     * zvládne aj priehlbinu hore, kde sú v jednom riadku dva samostatné úseky.
+     */
+    private static function renderHeartFill(ImageManager $m, ImageInterface $c, array $photos, string $title, ?string $sub): void
+    {
+        [$hx, $hy, $hw, $hh] = self::heartBox();
+
+        // Mozaika sa skladá zvlášť a až potom sa oreže
+        $mosaic = $m->createImage($hw, $hh)->fill(self::PAPER);
+
+        foreach (self::heartFillSlots() as $i => [$x, $y, $w, $h]) {
+            if (empty($photos[$i])) {
+                continue;
+            }
+            $photo = rescue(fn () => $m->decodeBinary($photos[$i])->cover($w, $h), null, false);
+            if ($photo) {
+                $mosaic->insert($photo, $x - $hx, $y - $hy, 'top-left');
+            }
+        }
+
+        $src = $mosaic->core()->native();
+        $dst = $c->core()->native();
+
+        for ($row = 0; $row < $hh; $row++) {
+            $y = 1.30 - ($row / $hh) * 2.65;
+            $start = null;
+
+            for ($col = 0; $col <= $hw; $col++) {
+                $x = ($col / $hw) * 2.6 - 1.3;
+                $inside = $col < $hw && pow($x * $x + $y * $y - 1, 3) - $x * $x * pow($y, 3) <= 0;
+
+                if ($inside && $start === null) {
+                    $start = $col;
+                } elseif (! $inside && $start !== null) {
+                    imagecopy($dst, $src, $hx + $start, $hy + $row, $start, $row, $col - $start, 1);
+                    $start = null;
+                }
+            }
+        }
+
+        self::centeredText($c, $title, self::W / 2, 300, 88, self::ACCENT, 'caveat');
+        if ($sub) {
+            self::centeredText($c, $sub, self::W / 2, self::H - 240, 34, self::INK, 'inter');
+        }
+        self::brand($c, self::H - 150);
     }
 
     // -------------------------------------------------------------- pomocníci
