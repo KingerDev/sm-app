@@ -48,8 +48,8 @@ class CollageBuilder
         ?string $subtitle = null,
         string $template = 'polaroid',
     ): ?string {
-        $photoPaths = array_values(array_filter($photoPaths));
-        if (! $photoPaths) {
+        // Prázdne miesta zostávajú prázdne — index určuje políčko šablóny.
+        if (! array_filter($photoPaths)) {
             return null;
         }
 
@@ -68,14 +68,11 @@ class CollageBuilder
         }
 
         $photos = [];
-        foreach ($photoPaths as $path) {
-            $bytes = rescue(fn () => $disk->get($path), null, false);
-            if ($bytes) {
-                $photos[] = $bytes;
-            }
+        foreach (array_values($photoPaths) as $i => $path) {
+            $photos[$i] = $path ? rescue(fn () => $disk->get($path), null, false) : null;
         }
 
-        if (! $photos) {
+        if (! array_filter($photos)) {
             return null;
         }
 
@@ -211,8 +208,8 @@ class CollageBuilder
     private static function renderPolaroid(ImageManager $m, ImageInterface $c, array $photos, string $title, ?string $sub): void
     {
         foreach (self::slots('polaroid') as $i => [$x, $y, $w, $h, $tilt]) {
-            if (! isset($photos[$i])) {
-                break;
+            if (empty($photos[$i])) {
+                continue;
             }
             self::place($m, $c, $photos[$i], $x, $y, $w, $h, $tilt, 26);
         }
@@ -225,7 +222,7 @@ class CollageBuilder
     private static function renderGrid(ImageManager $m, ImageInterface $c, array $photos, string $title, ?string $sub): void
     {
         foreach (self::slots('grid') as $i => [$x, $y, $w, $h, $tilt]) {
-            if (isset($photos[$i])) {
+            if (! empty($photos[$i])) {
                 self::place($m, $c, $photos[$i], $x, $y, $w, $h, $tilt, 0);
             }
         }
@@ -254,8 +251,8 @@ class CollageBuilder
     private static function renderTape(ImageManager $m, ImageInterface $c, array $photos, string $title, ?string $sub): void
     {
         foreach (self::slots('tape') as $i => [$x, $y, $w, $h, $tilt]) {
-            if (! isset($photos[$i])) {
-                break;
+            if (empty($photos[$i])) {
+                continue;
             }
             self::place($m, $c, $photos[$i], $x, $y, $w, $h, $tilt, 30);
             // Páska sedí na hornej hrane, mierne pootočená oproti fotke
@@ -270,8 +267,8 @@ class CollageBuilder
     private static function renderHeart(ImageManager $m, ImageInterface $c, array $photos, string $title, ?string $sub): void
     {
         foreach (self::slots('heart') as $i => [$x, $y, $w, $h, $tilt]) {
-            if (! isset($photos[$i])) {
-                break;
+            if (empty($photos[$i])) {
+                continue;
             }
             self::place($m, $c, $photos[$i], $x, $y, $w, $h, $tilt, 14);
         }
@@ -339,7 +336,7 @@ class CollageBuilder
     private static function renderCalendar(ImageManager $m, ImageInterface $c, array $photos, string $title, ?string $sub): void
     {
         foreach (self::slots('calendar') as $i => [$x, $y, $w, $h, $tilt]) {
-            if (isset($photos[$i])) {
+            if (! empty($photos[$i])) {
                 self::place($m, $c, $photos[$i], $x, $y, $w, $h, $tilt, 0);
 
                 continue;

@@ -58,7 +58,7 @@ class CollageController extends Controller
             'source_type' => 'required|in:moment,month,photos',
             'source_id' => 'nullable|string|max:255',
             'photo_ids' => 'nullable|array|max:30',
-            'photo_ids.*' => 'integer',
+            'photo_ids.*' => 'nullable|integer',
         ]);
 
         $paths = self::pickPhotos($data);
@@ -97,16 +97,15 @@ class CollageController extends Controller
     private static function pickPhotos(array $data): array
     {
         if (! empty($data['photo_ids'])) {
-            // Poradie určuje, ktorá fotka padne do ktorého políčka, takže sa musí
-            // zachovať presne tak, ako prišlo — databáza by vrátila svoje vlastné.
-            $byId = Photo::whereIn('id', $data['photo_ids'])
+            // Pozícia v poli = políčko šablóny, preto sa poradie musí zachovať
+            // presne (databáza by vrátila svoje) a prázdne miesta musia ostať
+            // prázdne — inak by sa fotka z posledného políčka posunula na prvé.
+            $byId = Photo::whereIn('id', array_filter($data['photo_ids']))
                 ->where('kind', 'image')
                 ->pluck('path', 'id');
 
             return collect($data['photo_ids'])
-                ->map(fn ($id) => $byId[$id] ?? null)
-                ->filter()
-                ->values()
+                ->map(fn ($id) => $id ? ($byId[$id] ?? null) : null)
                 ->all();
         }
 

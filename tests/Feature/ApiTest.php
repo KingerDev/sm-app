@@ -278,4 +278,47 @@ class ApiTest extends TestCase
             'source_id' => 'neexistuje',
         ])->assertStatus(422);
     }
+
+    public function test_photo_stays_in_the_slot_it_was_assigned_to(): void
+    {
+        \Storage::fake('public');
+        $this->actingAs($this->actingUser());
+
+        $moment = \App\Models\Moment::create([
+            'slug' => 'sloty', 'title' => 'Sloty', 'place' => 'Praha', 'place_short' => 'Praha',
+            'date_start' => '2026-06-01', 'date_display' => '1. jún 2026', 'date_short' => 'jún 2026',
+            'seed' => 'default',
+        ]);
+
+        $img = imagecreatetruecolor(400, 400);
+        imagefill($img, 0, 0, imagecolorallocate($img, 200, 40, 40));
+        ob_start();
+        imagejpeg($img);
+        $bytes = ob_get_clean();
+        \Storage::disk('public')->put('photos/moments/slot.jpg', $bytes);
+        $photo = $moment->photos()->create(['path' => 'photos/moments/slot.jpg', 'kind' => 'image']);
+
+        // Fotka len v poslednom (štvrtom) políčku — predchádzajúce prázdne
+        $res = $this->postJson('/api/v1/collages', [
+            'template' => 'polaroid',
+            'title' => 'Sloty',
+            'source_type' => 'photos',
+            'photo_ids' => [null, null, null, $photo->id],
+        ])->assertCreated();
+
+        $collage = \App\Models\Collage::find($res->json('id'));
+        $img = imagecreatefromstring(\Storage::disk('public')->get($collage->path));
+
+        // Políčko 4 je vpravo dole, políčko 1 vľavo hore — červená smie byť
+        // len v tom štvrtom, inak sa fotka posunula na začiatok.
+        $slots = \App\Support\CollageBuilder::slots('polaroid');
+        $isRed = function (array $slot) use ($img) {
+            $rgb = imagecolorat($img, (int) ($slot[0] + $slot[2] / 2), (int) ($slot[1] + $slot[3] / 2));
+
+            return (($rgb >> 16) & 0xFF) > 150 && (($rgb >> 8) & 0xFF) < 90;
+        };
+
+        $this->assertTrue($isRed($slots[3]), 'fotka nie je v políčku, kam patrí');
+        $this->assertFalse($isRed($slots[0]), 'fotka sa posunula do prvého políčka');
+    }
 }
