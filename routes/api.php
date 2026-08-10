@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\PhotoController;
 use App\Http\Controllers\Api\SettingsController;
 use App\Http\Controllers\Api\StatsController;
 use App\Http\Controllers\Api\WishlistController;
+use App\Http\Controllers\Api\CollageController;
 use App\Http\Controllers\Api\WrappedController;
 use Illuminate\Support\Facades\Route;
 
@@ -73,6 +74,11 @@ Route::prefix('v1')->group(function () {
         Route::post('/capsules', [CapsuleController::class, 'store']);
         Route::get('/capsules/{slug}', [CapsuleController::class, 'show']);
         Route::delete('/capsules/{slug}', [CapsuleController::class, 'destroy']);
+
+        Route::get('/collages', [CollageController::class, 'index']);
+        Route::get('/collages/templates', [CollageController::class, 'templates']);
+        Route::post('/collages', [CollageController::class, 'store']);
+        Route::delete('/collages/{id}', [CollageController::class, 'destroy']);
 
         Route::get('/wrapped', [WrappedController::class, 'index']);
         // Ročná koláž musí byť pred {wrappedId}, inak by ju pohltil ten parameter.

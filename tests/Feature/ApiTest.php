@@ -213,4 +213,69 @@ class ApiTest extends TestCase
         $this->actingAs($this->actingUser());
         $this->getJson('/api/v1/wrapped/1999-01/collage')->assertNotFound();
     }
+
+    public function test_collage_can_be_created_listed_and_deleted(): void
+    {
+        \Storage::fake('public');
+        $this->actingAs($this->actingUser());
+
+        $moment = \App\Models\Moment::create([
+            'slug' => 'kolaz-flow', 'title' => 'Praha', 'place' => 'Praha',
+            'place_short' => 'Praha', 'date_start' => '2026-05-02', 'date_display' => '2. máj 2026',
+            'date_short' => 'máj 2026', 'seed' => 'default',
+        ]);
+
+        foreach ([1, 2, 3] as $i) {
+            $img = imagecreatetruecolor(500, 500);
+            imagefill($img, 0, 0, imagecolorallocate($img, 30 * $i, 90, 60));
+            ob_start();
+            imagejpeg($img);
+            $bytes = ob_get_clean();
+            $path = "photos/moments/flow-{$i}.jpg";
+            \Storage::disk('public')->put($path, $bytes);
+            $moment->photos()->create(['path' => $path, 'kind' => 'image', 'sort_order' => $i]);
+        }
+
+        // šablóny sa dajú vypýtať
+        $this->getJson('/api/v1/collages/templates')
+            ->assertOk()
+            ->assertJsonFragment(['key' => 'tape']);
+
+        // vytvorenie z momentu
+        $res = $this->postJson('/api/v1/collages', [
+            'template' => 'tape',
+            'title' => 'Praha 2026',
+            'subtitle' => 'prvý spoločný výlet',
+            'source_type' => 'moment',
+            'source_id' => 'kolaz-flow',
+        ])->assertCreated();
+
+        $id = $res->json('id');
+        $this->assertSame(3, $res->json('photos_count'));
+        $this->assertStringContainsString('collages/', $res->json('path'));
+
+        [$w, $h] = getimagesizefromstring(\Storage::disk('public')->get($res->json('path')));
+        $this->assertSame([1080, 1920], [$w, $h]);
+
+        $this->getJson('/api/v1/collages')->assertOk()->assertJsonCount(1);
+
+        // zmazanie odstráni aj súbor
+        $path = $res->json('path');
+        $this->deleteJson("/api/v1/collages/{$id}")->assertNoContent();
+        $this->assertFalse(\Storage::disk('public')->exists($path), 'súbor koláže zostal na disku');
+        $this->getJson('/api/v1/collages')->assertOk()->assertJsonCount(0);
+    }
+
+    public function test_collage_without_photos_is_rejected(): void
+    {
+        \Storage::fake('public');
+        $this->actingAs($this->actingUser());
+
+        $this->postJson('/api/v1/collages', [
+            'template' => 'grid',
+            'title' => 'Prázdno',
+            'source_type' => 'moment',
+            'source_id' => 'neexistuje',
+        ])->assertStatus(422);
+    }
 }
