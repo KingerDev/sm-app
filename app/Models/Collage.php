@@ -8,8 +8,11 @@ use Illuminate\Support\Facades\Storage;
 class Collage extends Model
 {
     protected $fillable = [
-        'template', 'title', 'subtitle', 'path', 'photos_count', 'source_type', 'source_id',
+        'template', 'format', 'title', 'subtitle', 'config', 'path', 'photos_count',
+        'source_type', 'source_id',
     ];
+
+    protected $casts = ['config' => 'array'];
 
     protected $appends = ['url'];
 

@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\BucketController;
 use App\Http\Controllers\Api\CapsuleController;
 use App\Http\Controllers\Api\CountryController;
 use App\Http\Controllers\Api\EventController;
+use App\Http\Controllers\Api\GiftController;
 use App\Http\Controllers\Api\MomentController;
 use App\Http\Controllers\Api\NoteController;
 use App\Http\Controllers\Api\PhotoController;
@@ -76,10 +77,13 @@ Route::prefix('v1')->group(function () {
         Route::delete('/capsules/{slug}', [CapsuleController::class, 'destroy']);
 
         Route::get('/collages', [CollageController::class, 'index']);
-        Route::get('/collages/templates', [CollageController::class, 'templates']);
-        Route::get('/collages/templates/{key}/preview', [CollageController::class, 'preview']);
         Route::post('/collages', [CollageController::class, 'store']);
         Route::delete('/collages/{id}', [CollageController::class, 'destroy']);
+
+        Route::get('/gifts', [GiftController::class, 'index']);
+        Route::post('/gifts', [GiftController::class, 'store']);
+        Route::patch('/gifts/{id}/open', [GiftController::class, 'open']);
+        Route::delete('/gifts/{id}', [GiftController::class, 'destroy']);
 
         Route::get('/wrapped', [WrappedController::class, 'index']);
         // Ročná koláž musí byť pred {wrappedId}, inak by ju pohltil ten parameter.

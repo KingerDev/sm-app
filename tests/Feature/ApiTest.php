@@ -214,166 +214,102 @@ class ApiTest extends TestCase
         $this->getJson('/api/v1/wrapped/1999-01/collage')->assertNotFound();
     }
 
-    public function test_collage_can_be_created_listed_and_deleted(): void
+    public function test_collage_image_from_the_app_is_stored_listed_and_deleted(): void
     {
         \Storage::fake('public');
         $this->actingAs($this->actingUser());
 
-        $moment = \App\Models\Moment::create([
-            'slug' => 'navsteva-demanovskej-jaskyne-slobody-teda-vlastne-lumina-verse-2026', 'title' => 'Praha', 'place' => 'Praha',
-            'place_short' => 'Praha', 'date_start' => '2026-05-02', 'date_display' => '2. máj 2026',
-            'date_short' => 'máj 2026', 'seed' => 'default',
-        ]);
-
-        foreach ([1, 2, 3] as $i) {
-            $img = imagecreatetruecolor(500, 500);
-            imagefill($img, 0, 0, imagecolorallocate($img, 30 * $i, 90, 60));
-            ob_start();
-            imagejpeg($img);
-            $bytes = ob_get_clean();
-            $path = "photos/moments/flow-{$i}.jpg";
-            \Storage::disk('public')->put($path, $bytes);
-            $moment->photos()->create(['path' => $path, 'kind' => 'image', 'sort_order' => $i]);
-        }
-
-        // šablóny sa dajú vypýtať
-        $this->getJson('/api/v1/collages/templates')
-            ->assertOk()
-            ->assertJsonFragment(['key' => 'tape']);
-
-        // vytvorenie z momentu
         $res = $this->postJson('/api/v1/collages', [
-            'template' => 'tape',
+            'image' => \Illuminate\Http\UploadedFile::fake()->image('kolaz.jpg', 1080, 1080),
             'title' => 'Praha 2026',
             'subtitle' => 'prvý spoločný výlet',
-            'source_type' => 'moment',
-            'source_id' => 'navsteva-demanovskej-jaskyne-slobody-teda-vlastne-lumina-verse-2026',
+            'layout' => 'grid',
+            'format' => 'square',
+            'photos_count' => 4,
+            'config' => json_encode(['layout' => 'grid', 'bg' => 'sand', 'stickers' => []]),
+            'source_type' => 'photos',
         ])->assertCreated();
 
-        $id = $res->json('id');
-        $this->assertSame(3, $res->json('photos_count'));
-        $this->assertStringContainsString('collages/', $res->json('path'));
+        $path = $res->json('path');
+        $this->assertStringContainsString('collages/', $path);
+        $this->assertTrue(\Storage::disk('public')->exists($path), 'obrázok koláže sa neuložil');
 
-        [$w, $h] = getimagesizefromstring(\Storage::disk('public')->get($res->json('path')));
-        $this->assertSame([1080, 1920], [$w, $h]);
+        // Nastavenie sa musí vrátiť ako pole, nie ako reťazec — appka z neho
+        // vie koláž znova otvoriť na úpravu
+        $this->assertSame('sand', $res->json('config.bg'));
 
         $this->getJson('/api/v1/collages')->assertOk()->assertJsonCount(1);
 
-        // zmazanie odstráni aj súbor
-        $path = $res->json('path');
-        $this->deleteJson("/api/v1/collages/{$id}")->assertNoContent();
+        $this->deleteJson('/api/v1/collages/'.$res->json('id'))->assertNoContent();
         $this->assertFalse(\Storage::disk('public')->exists($path), 'súbor koláže zostal na disku');
-        $this->getJson('/api/v1/collages')->assertOk()->assertJsonCount(0);
     }
 
-    public function test_collage_without_photos_is_rejected(): void
+    public function test_collage_without_an_image_is_rejected(): void
     {
         \Storage::fake('public');
         $this->actingAs($this->actingUser());
 
         $this->postJson('/api/v1/collages', [
-            'template' => 'grid',
-            'title' => 'Prázdno',
-            'source_type' => 'moment',
-            'source_id' => 'neexistuje',
+            'title' => 'Bez obrázka',
+            'layout' => 'grid',
+            'format' => 'square',
+            'photos_count' => 3,
+            'source_type' => 'photos',
         ])->assertStatus(422);
     }
 
-    public function test_photo_stays_in_the_slot_it_was_assigned_to(): void
+    public function test_gift_goes_to_the_other_user_and_records_being_opened(): void
     {
         \Storage::fake('public');
-        $this->actingAs($this->actingUser());
 
-        $moment = \App\Models\Moment::create([
-            'slug' => 'sloty', 'title' => 'Sloty', 'place' => 'Praha', 'place_short' => 'Praha',
-            'date_start' => '2026-06-01', 'date_display' => '1. jún 2026', 'date_short' => 'jún 2026',
-            'seed' => 'default',
+        $sender = User::factory()->create(['name' => 'S', 'email' => 's@sm.app']);
+        $recipient = $this->actingUser();
+
+        $collage = \App\Models\Collage::create([
+            'template' => 'grid', 'format' => 'square', 'title' => 'Viedeň',
+            'path' => 'collages/x.jpg', 'photos_count' => 3, 'source_type' => 'photos',
         ]);
 
-        $img = imagecreatetruecolor(400, 400);
-        imagefill($img, 0, 0, imagecolorallocate($img, 200, 40, 40));
-        ob_start();
-        imagejpeg($img);
-        $bytes = ob_get_clean();
-        \Storage::disk('public')->put('photos/moments/slot.jpg', $bytes);
-        $photo = $moment->photos()->create(['path' => 'photos/moments/slot.jpg', 'kind' => 'image']);
-
-        // Fotka len v poslednom (štvrtom) políčku — predchádzajúce prázdne
-        $res = $this->postJson('/api/v1/collages', [
-            'template' => 'polaroid',
-            'title' => 'Sloty',
-            'source_type' => 'photos',
-            'photo_ids' => [null, null, null, $photo->id],
+        $this->actingAs($sender);
+        $gift = $this->postJson('/api/v1/gifts', [
+            'collage_id' => $collage->id,
+            'note' => 'aby si si spomenula',
         ])->assertCreated();
 
-        $collage = \App\Models\Collage::find($res->json('id'));
-        $img = imagecreatefromstring(\Storage::disk('public')->get($collage->path));
+        // Odosielateľ vidí, že darček čaká
+        $this->assertTrue($gift->json('sent'));
+        $this->assertFalse($gift->json('opened'));
+        $this->assertSame('M', $gift->json('to'));
 
-        // Políčko 4 je vpravo dole, políčko 1 vľavo hore — červená smie byť
-        // len v tom štvrtom, inak sa fotka posunula na začiatok.
-        $slots = \App\Support\CollageBuilder::slots('polaroid');
-        $isRed = function (array $slot) use ($img) {
-            $rgb = imagecolorat($img, (int) ($slot[0] + $slot[2] / 2), (int) ($slot[1] + $slot[3] / 2));
+        // Príjemcovi príde ako darček, nie ako odoslaný
+        $this->actingAs($recipient);
+        $mine = $this->getJson('/api/v1/gifts')->assertOk()->assertJsonCount(1);
+        $this->assertFalse($mine->json('0.sent'));
+        $this->assertSame('S', $mine->json('0.from'));
 
-            return (($rgb >> 16) & 0xFF) > 150 && (($rgb >> 8) & 0xFF) < 90;
-        };
+        $this->patchJson('/api/v1/gifts/'.$gift->json('id').'/open')
+            ->assertOk()
+            ->assertJson(['opened' => true]);
 
-        $this->assertTrue($isRed($slots[3]), 'fotka nie je v políčku, kam patrí');
-        $this->assertFalse($isRed($slots[0]), 'fotka sa posunula do prvého políčka');
+        // A odosielateľ to hneď vidí
+        $this->actingAs($sender);
+        $this->assertTrue($this->getJson('/api/v1/gifts')->json('0.opened'));
     }
 
-    public function test_caption_is_written_under_the_photo_it_belongs_to(): void
+    public function test_gift_cannot_be_opened_by_the_sender(): void
     {
-        \Storage::fake('public');
-        $this->actingAs($this->actingUser());
+        $sender = User::factory()->create(['name' => 'S', 'email' => 's@sm.app']);
+        $this->actingUser();
 
-        $moment = \App\Models\Moment::create([
-            'slug' => 'popisky', 'title' => 'Popisky', 'place' => 'Praha', 'place_short' => 'Praha',
-            'date_start' => '2026-07-01', 'date_display' => '1. júl 2026', 'date_short' => 'júl 2026',
-            'seed' => 'default',
+        $collage = \App\Models\Collage::create([
+            'template' => 'grid', 'format' => 'square', 'title' => 'Viedeň',
+            'path' => 'collages/y.jpg', 'photos_count' => 3, 'source_type' => 'photos',
         ]);
 
-        $ids = [];
-        foreach ([1, 2, 3] as $i) {
-            $img = imagecreatetruecolor(400, 400);
-            imagefill($img, 0, 0, imagecolorallocate($img, 200, 40, 40));
-            ob_start();
-            imagejpeg($img);
-            \Storage::disk('public')->put("photos/moments/cap-{$i}.jpg", ob_get_clean());
-            $ids[] = $moment->photos()->create(['path' => "photos/moments/cap-{$i}.jpg", 'kind' => 'image'])->id;
-        }
+        $this->actingAs($sender);
+        $gift = $this->postJson('/api/v1/gifts', ['collage_id' => $collage->id])->assertCreated();
 
-        // Popisok len pod treťou fotkou — pod prvou nesmie skončiť nič
-        $res = $this->postJson('/api/v1/collages', [
-            'template' => 'caption',
-            'title' => 'Popisky',
-            'source_type' => 'photos',
-            'photo_ids' => $ids,
-            'captions' => [null, null, 'HHHHHHH'],
-        ])->assertCreated();
-
-        $collage = \App\Models\Collage::find($res->json('id'));
-        $img = imagecreatefromstring(\Storage::disk('public')->get($collage->path));
-
-        // Popisok je tmavý text v bielom okraji pod fotkou — stačí spočítať,
-        // koľko tmavých bodov v tom páse je.
-        $inkPixels = function (array $slot) use ($img) {
-            $count = 0;
-            for ($y = $slot[1] + $slot[3] + 30; $y < $slot[1] + $slot[3] + 90; $y += 2) {
-                for ($x = $slot[0]; $x < $slot[0] + $slot[2]; $x += 2) {
-                    $rgb = imagecolorat($img, (int) $x, (int) $y);
-                    if ((($rgb >> 16) & 0xFF) < 110 && (($rgb >> 8) & 0xFF) < 110) {
-                        $count++;
-                    }
-                }
-            }
-
-            return $count;
-        };
-
-        $slots = \App\Support\CollageBuilder::slots('caption');
-
-        $this->assertGreaterThan(40, $inkPixels($slots[2]), 'popisok sa pod tretiu fotku nedostal');
-        $this->assertLessThan(10, $inkPixels($slots[0]), 'popisok skončil pod nesprávnou fotkou');
+        // Inak by si odosielateľ vlastný darček „otvoril" a druhý by to už nevidel
+        $this->patchJson('/api/v1/gifts/'.$gift->json('id').'/open')->assertNotFound();
     }
 }
