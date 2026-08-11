@@ -78,6 +78,8 @@ Route::prefix('v1')->group(function () {
 
         Route::get('/collages', [CollageController::class, 'index']);
         Route::post('/collages', [CollageController::class, 'store']);
+        // POST kvôli multipart uploadu obrázka (PHP nespracuje súbory v PATCH)
+        Route::match(['patch', 'post'], '/collages/{id}', [CollageController::class, 'update'])->whereNumber('id');
         Route::delete('/collages/{id}', [CollageController::class, 'destroy']);
 
         Route::get('/gifts', [GiftController::class, 'index']);

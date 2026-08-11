@@ -244,6 +244,46 @@ class ApiTest extends TestCase
         $this->assertFalse(\Storage::disk('public')->exists($path), 'súbor koláže zostal na disku');
     }
 
+    public function test_collage_can_be_edited_and_the_old_image_is_removed(): void
+    {
+        \Storage::fake('public');
+        $this->actingAs($this->actingUser());
+
+        $first = $this->postJson('/api/v1/collages', [
+            'image' => \Illuminate\Http\UploadedFile::fake()->image('a.jpg', 1080, 1080),
+            'title' => 'Prvá verzia',
+            'layout' => 'grid',
+            'format' => 'square',
+            'photos_count' => 4,
+            'config' => json_encode(['cfg' => ['bg' => 'sand'], 'photos' => [['id' => 1]]]),
+            'source_type' => 'photos',
+        ])->assertCreated();
+
+        $oldPath = $first->json('path');
+
+        $second = $this->post('/api/v1/collages/'.$first->json('id'), [
+            'image' => \Illuminate\Http\UploadedFile::fake()->image('b.jpg', 1080, 1350),
+            'title' => 'Upravená',
+            'layout' => 'stack',
+            'format' => 'portrait',
+            'photos_count' => 5,
+            'config' => json_encode(['cfg' => ['bg' => 'ink'], 'photos' => [['id' => 2]]]),
+            'source_type' => 'photos',
+        ], ['Accept' => 'application/json'])->assertOk();
+
+        // Ostáva to tá istá koláž, nevzniká druhá
+        $this->assertSame($first->json('id'), $second->json('id'));
+        $this->getJson('/api/v1/collages')->assertOk()->assertJsonCount(1);
+
+        $this->assertSame('Upravená', $second->json('title'));
+        $this->assertSame('ink', $second->json('config.cfg.bg'));
+        $this->assertNotSame($oldPath, $second->json('path'));
+
+        // Starý obrázok už na nič neodkazuje
+        $this->assertFalse(\Storage::disk('public')->exists($oldPath), 'starý obrázok zostal na disku');
+        $this->assertTrue(\Storage::disk('public')->exists($second->json('path')));
+    }
+
     public function test_collage_without_an_image_is_rejected(): void
     {
         \Storage::fake('public');

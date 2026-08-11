@@ -25,7 +25,55 @@ class CollageController extends Controller
 
     public function store(Request $request): JsonResponse
     {
-        $data = $request->validate([
+        $data = self::validated($request);
+
+        $collage = Collage::create([
+            'template' => $data['layout'],
+            'format' => $data['format'],
+            'title' => $data['title'],
+            'subtitle' => $data['subtitle'] ?? null,
+            'config' => isset($data['config']) ? json_decode($data['config'], true) : null,
+            'path' => self::storeImage($request),
+            'photos_count' => $data['photos_count'],
+            'source_type' => $data['source_type'],
+            'source_id' => $data['source_id'] ?? null,
+        ]);
+
+        return response()->json($collage, 201);
+    }
+
+    /**
+     * Prepíše koláž novou verziou. Obrázok sa nahradí a ten starý sa zmaže —
+     * po úprave už na nič neodkazuje a na R2 by len zaberal miesto.
+     *
+     * Ide cez POST, nie PATCH: PHP v PATCH požiadavke súbory nespracuje.
+     */
+    public function update(Request $request, int $id): JsonResponse
+    {
+        $collage = Collage::findOrFail($id);
+        $data = self::validated($request);
+        $old = $collage->path;
+
+        $collage->update([
+            'template' => $data['layout'],
+            'format' => $data['format'],
+            'title' => $data['title'],
+            'subtitle' => $data['subtitle'] ?? null,
+            'config' => isset($data['config']) ? json_decode($data['config'], true) : null,
+            'path' => self::storeImage($request),
+            'photos_count' => $data['photos_count'],
+        ]);
+
+        if ($old !== $collage->path && ! Collage::where('path', $old)->exists()) {
+            Storage::disk(config('filesystems.media'))->delete($old);
+        }
+
+        return response()->json($collage);
+    }
+
+    private static function validated(Request $request): array
+    {
+        return $request->validate([
             'image' => 'required|image|max:12288',
             'title' => 'required|string|max:60',
             'subtitle' => 'nullable|string|max:80',
@@ -39,7 +87,10 @@ class CollageController extends Controller
             'source_type' => 'required|in:moment,month,photos',
             'source_id' => 'nullable|string|max:255',
         ]);
+    }
 
+    private static function storeImage(Request $request): string
+    {
         $path = 'collages/'.Str::uuid()->toString().'.jpg';
 
         Storage::disk(config('filesystems.media'))->put(
@@ -47,19 +98,7 @@ class CollageController extends Controller
             file_get_contents($request->file('image')->getRealPath()),
         );
 
-        $collage = Collage::create([
-            'template' => $data['layout'],
-            'format' => $data['format'],
-            'title' => $data['title'],
-            'subtitle' => $data['subtitle'] ?? null,
-            'config' => isset($data['config']) ? json_decode($data['config'], true) : null,
-            'path' => $path,
-            'photos_count' => $data['photos_count'],
-            'source_type' => $data['source_type'],
-            'source_id' => $data['source_id'] ?? null,
-        ]);
-
-        return response()->json($collage, 201);
+        return $path;
     }
 
     public function destroy(int $id): JsonResponse
