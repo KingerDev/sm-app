@@ -10,14 +10,16 @@ use Intervention\Image\Encoders\WebpEncoder;
 use Intervention\Image\ImageManager;
 
 /**
- * Optimalizácia fotiek pri uploade — 25MB fotka z mobilu sa uloží ako
- * WebP ~0,5–1,5 MB (max 2560 px) + miniatúra ~400 px pre mriežky.
+ * Spracovanie fotiek pri uploade — WebP v plnej kvalite (max 4096 px, q92)
+ * + miniatúra ~480 px pre mriežky. Fotka z mobilu tak zaberie ~3–6 MB
+ * namiesto ~1 MB, ale nestráca detail; miniatúra ostáva malá, lebo sa
+ * v mriežkach nikdy nezobrazuje vo veľkom.
  * EXIF rotácia sa aplikuje automaticky pri dekódovaní.
  */
 class Images
 {
-    private const MAX_DIMENSION = 2560;
-    private const MAX_QUALITY = 82;
+    private const MAX_DIMENSION = 4096;
+    private const MAX_QUALITY = 92;
     private const THUMB_DIMENSION = 480;
     private const THUMB_QUALITY = 75;
 

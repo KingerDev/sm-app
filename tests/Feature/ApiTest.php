@@ -72,7 +72,7 @@ class ApiTest extends TestCase
             'date_display' => '1. júl 2026', 'date_short' => 'júl 2026', 'seed' => 'home',
         ]);
 
-        $file = \Illuminate\Http\Testing\File::image('velka.jpg', 4000, 3000);
+        $file = \Illuminate\Http\Testing\File::image('velka.jpg', 5000, 3750);
 
         $res = $this->post('/api/v1/photos', [
             'type' => 'moment', 'id' => $moment->id, 'files' => [$file],
@@ -84,9 +84,9 @@ class ApiTest extends TestCase
         \Storage::disk('public')->assertExists($photo->path);
         \Storage::disk('public')->assertExists($photo->thumb_path);
 
-        // hlavná fotka zmenšená na max 2560 px
+        // hlavná fotka zmenšená na max 4096 px
         [$w, $h] = getimagesizefromstring(\Storage::disk('public')->get($photo->path));
-        $this->assertLessThanOrEqual(2560, max($w, $h));
+        $this->assertLessThanOrEqual(4096, max($w, $h));
 
         // miniatúra max 480 px
         [$tw, $th] = getimagesizefromstring(\Storage::disk('public')->get($photo->thumb_path));

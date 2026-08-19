@@ -140,7 +140,7 @@ export default function CoverPicker({
         const sy = -oy / s;
         const sw = frame.w / s;
         const sh = frame.h / s;
-        const outW = Math.min(Math.round(sw), 2560);
+        const outW = Math.min(Math.round(sw), 4096);
         const outH = Math.round(outW * sh / sw);
 
         const canvas = document.createElement('canvas');
@@ -153,7 +153,7 @@ export default function CoverPicker({
         canvas.toBlob((blob) => {
             if (!blob) { setBusy(false); return; }
             onSave(new File([blob], 'vyrez.jpg', { type: 'image/jpeg' }));
-        }, 'image/jpeg', 0.92);
+        }, 'image/jpeg', 0.98);
     };
 
     const reset = () => {

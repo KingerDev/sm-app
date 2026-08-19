@@ -65,7 +65,7 @@ export default function PhotoEditor({ file, onCancel, onSave }) {
             if (!blob) { setBusy(false); return; }
             const name = file.name.replace(/\.\w+$/, '') + '-upravene.jpg';
             onSave(new File([blob], name, { type: 'image/jpeg' }));
-        }, 'image/jpeg', 0.95);
+        }, 'image/jpeg', 0.98);
     };
 
     const toolBtn = {
